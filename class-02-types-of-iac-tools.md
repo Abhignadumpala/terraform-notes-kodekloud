@@ -55,7 +55,6 @@ Just describe what I want. Terraform handles all the waiting, checking, and erro
 
 IaC tools aren't all the same — they fall into three categories, each solving a different problem.
 
-![Overview of IaC tools: Docker, Ansible, Terraform, CloudFormation, Packer, Vagrant, SaltStack, Puppet](images/01-iac-tools-overview.png)
 
 ![The three categories: Configuration Management, Server Templating, Provisioning Tools](images/03-three-categories.png)
 
@@ -90,7 +89,11 @@ IaC tools aren't all the same — they fall into three categories, each solving 
 
 ### 2. Server Templating
 
+
 **Tools:** Docker, Packer, Vagrant (Packer and Vagrant are both HashiCorp tools)
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/00cd7d40-06e6-4cb0-9e6d-77ca34c1774c" />
+
 
 **What they're for:** building a custom "image" that already has all the software and dependencies pre-installed — instead of installing things *after* a server is created, the image already comes ready-to-go.
 
@@ -106,6 +109,9 @@ IaC tools aren't all the same — they fall into three categories, each solving 
 ### 3. Provisioning Tools
 
 **Tools:** Terraform, AWS CloudFormation
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/4afb9c62-bb59-415c-93fb-31f35604649f" />
+
 
 **What they're for:** actually creating the infrastructure itself — virtual machines, VPCs, databases, subnets, security groups, storage — using a declarative, high-level language.
 
