@@ -7,6 +7,9 @@
 
 ## The Traditional IT Request Chain
 
+<img width="1595" height="903" alt="image" src="https://github.com/user-attachments/assets/a842d55a-49fa-4d14-b12b-d8093a829dca" />
+
+
 Before cloud computing, getting a single server provisioned meant passing through a long chain of people and approvals — often taking **weeks to months**.
 
 ### The approval chain
@@ -49,6 +52,9 @@ Each handoff between teams involves waiting — a ticket sitting in a queue, an 
 Cloud providers (AWS, Azure, GCP) collapsed the entire chain — Business → Procurement → 5 different admin teams → data center — into a **self-service web console or API** that takes minutes, not weeks.
 
 ### Example: launching an EC2 instance (AWS Console)
+
+<img width="1600" height="829" alt="image" src="https://github.com/user-attachments/assets/51034948-8bf1-4584-86b7-c6cdfdeb5992" />
+
 
 The traditional multi-team, multi-week process becomes a 7-step wizard anyone can complete themselves:
 
