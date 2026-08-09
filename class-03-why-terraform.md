@@ -115,7 +115,7 @@ Beyond the CLI I've been using, HashiCorp also offers:
 
 ![Terraform Cloud workspaces dashboard showing run status for two projects](images/10-terraform-cloud-enterprise.png)
 
-(Already covered the CLI vs Cloud distinction in more depth in my earlier notes — this confirms Cloud/Enterprise sit a level above what I've been using so far.)
+> 📖 **Read More** → [Terraform CLI vs Terraform Cloud](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/terraform-cli-vs-cloud.md)
 
 ---
 
