@@ -55,7 +55,6 @@ Just describe what I want. Terraform handles all the waiting, checking, and erro
 
 IaC tools aren't all the same — they fall into three categories, each solving a different problem.
 
-![Overview of IaC tools: Docker, Ansible, Terraform, CloudFormation, Packer, Vagrant, SaltStack, Puppet](images/01-iac-tools-overview.png)
 
 ![The three categories: Configuration Management, Server Templating, Provisioning Tools](images/03-three-categories.png)
 
