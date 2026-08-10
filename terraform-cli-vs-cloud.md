@@ -39,6 +39,4 @@ A managed service that runs Terraform *for* me, in the cloud, instead of on my o
 
 ---
 
-## Where This Fits
 
-Everything I've practiced so far (Day 1, Day 2 of this KodeKloud course) uses plain **Terraform CLI** — which is exactly right for solo learning and personal projects. Terraform Cloud/Enterprise becomes relevant once working with a team, or wanting CI/CD-driven deployments without keeping AWS credentials on a personal laptop.
