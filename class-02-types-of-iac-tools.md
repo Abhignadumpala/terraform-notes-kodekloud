@@ -11,7 +11,8 @@ Before tools like Terraform existed, people provisioned infrastructure by writin
 
 Example: a script that creates an EC2 instance, waits for it to be running, checks its status, and assigns it an IP address:
 
-![Bash script vs AWS console launch wizard](images/02-script-vs-terraform.png)
+<img width="1486" height="828" alt="image" src="https://github.com/user-attachments/assets/c0abf4db-58a7-4107-b203-92b182be4a58" />
+
 
 ```bash
 #!/bin/bash
@@ -56,7 +57,8 @@ Just describe what I want. Terraform handles all the waiting, checking, and erro
 IaC tools aren't all the same — they fall into three categories, each solving a different problem.
 
 
-![The three categories: Configuration Management, Server Templating, Provisioning Tools](images/03-three-categories.png)
+<img width="1486" height="828" alt="image" src="https://github.com/user-attachments/assets/ef9ec6dc-1f15-4c11-acc4-a7dbf931c7dd" />
+
 
 ### 1. Configuration Management
 
@@ -64,7 +66,8 @@ IaC tools aren't all the same — they fall into three categories, each solving 
 
 **What they're for:** installing and managing *software* on servers that already exist. So if I already have a server running, these tools install packages, update configs, manage users, etc. on it.
 
-![Configuration management: designed to install and manage software, standard structure, version control, idempotent](images/04-configuration-management-detail.png)
+<img width="1486" height="828" alt="image" src="https://github.com/user-attachments/assets/0c86934b-05fc-4d23-a8ee-01ac65da1f8f" />
+
 
 **Key features:**
 - Designed to install and manage software
