@@ -25,10 +25,28 @@ resource "local_file" "pet" {
 <img width="642" height="666" alt="local.tf written in vim" src="images/01-vim-local-tf.png" />
 
 **Breaking it down:**
-- `resource` — the block type, declaring we want to create something.
-- `"local_file"` — the resource type (from the local provider).
-- `"pet"` — the resource's local name, used to reference it elsewhere in config.
-- `filename` and `content` — required arguments for this resource type. `filename` is the full path where the file gets created, `content` is the text written into it.
+
+<img width="1523" height="800" alt="HCL block anatomy diagram" src="images/00-hcl-block-anatomy-diagram.png" />
+
+Mapped to my own config:
+
+```hcl
+resource "local_file" "pet" {
+  filename = "/home/sri-abhi/pets.txt"
+  content  = "We love pets!"
+}
+```
+
+| Part | Value | What it means |
+|---|---|---|
+| **Block Name** | `resource` | Declares we want Terraform to create something. |
+| **Resource Type** | `"local_file"` | `local` = the provider, `file` = the resource — together, `local_file` creates a file on the local system. |
+| **Resource Name** | `"pet"` | A logical name I chose, used to reference this resource elsewhere in config (e.g. `local_file.pet`). |
+| **Arguments** | `filename`, `content` | Key-value pairs inside the block that configure the resource. |
+| — `filename` | `/home/sri-abhi/pets.txt` | The full path where the file gets created. |
+| — `content` | `"We love pets!"` | The text written into that file. |
+
+Every resource type has its own required arguments — `local_file` needs `filename` and `content`, but an `aws_instance` would need things like `ami` and `instance_type` instead.
 
 ## 3. Initialize
 
