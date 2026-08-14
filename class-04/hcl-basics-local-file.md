@@ -22,6 +22,8 @@ resource "local_file" "pet" {
 }
 ```
 
+<img width="642" height="666" alt="local.tf written in vim" src="images/01-vim-local-tf.png" />
+
 **Breaking it down:**
 - `resource` — the block type, declaring we want to create something.
 - `"local_file"` — the resource type (from the local provider).
@@ -47,6 +49,8 @@ selections it made above.
 
 Terraform has been successfully initialized!
 ```
+
+<img width="642" height="666" alt="terraform init output" src="images/02-terraform-init.png" />
 
 `terraform init` reads the config, detects the `local` provider is needed, downloads it, and creates a `.terraform.lock.hcl` file to pin that provider version for consistency.
 
@@ -94,6 +98,8 @@ local_file.pet: Creation complete after 0s [id=cba595b7d9f94ba1107a46f3f731912d9
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
 
+<img width="642" height="666" alt="terraform plan and apply output" src="images/03-terraform-plan-apply.png" />
+
 ## 6. Verify
 
 The file gets created at the path set in `filename` — in this case my home folder, not the project folder. The project folder (`terraform-local-file`) only holds the config and Terraform's own tracking files:
@@ -132,6 +138,8 @@ resource "local_file" "pet" {
 }
 ```
 
+<img width="642" height="666" alt="terraform show and file verification" src="images/04-terraform-show-verify.png" />
+
 ## Key takeaway
 
 `terraform.tfstate` is what makes this all click — it's Terraform's record of what it created and where. Run `terraform apply` again with no changes and Terraform tells you there's nothing to do, because state already matches config:
@@ -149,6 +157,8 @@ differences, so no changes are needed.
 
 Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
 ```
+
+<img width="642" height="666" alt="terraform apply showing no changes" src="images/05-terraform-apply-no-changes.png" />
 
 This local-file example is deliberately simple, but the exact same `init → plan → apply` loop is what drives real AWS/Azure/GCP resources later on.
 
