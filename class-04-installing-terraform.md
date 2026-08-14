@@ -30,6 +30,8 @@ terraform version
 Terraform v1.15.8
 on linux_amd64
 ```
+<img width="1799" height="427" alt="Screenshot From 2026-08-14 01-14-34" src="https://github.com/user-attachments/assets/66b45546-1b75-469f-a578-09e05fa1afdf" />
+
 
 ## Working with Terraform
 
