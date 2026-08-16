@@ -28,7 +28,7 @@ ls
 vim cat.tf
 ```
 
-<img width="570" height="66" alt="ls showing local.tf before adding cat.tf" src="images/02-ls-before-cat-tf.png" />
+<img width="570" height="100" alt="ls showing local.tf before adding cat.tf" src="images/02-ls-before-cat-tf.png" />
 
 ```hcl
 resource "local_file" "cat" {
