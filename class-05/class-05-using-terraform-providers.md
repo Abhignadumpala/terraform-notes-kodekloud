@@ -64,11 +64,11 @@ So these two are equivalent:
 
 ## Locking Provider Versions
 
-Always mention the provider version in your config. If you don't, Terraform installs the latest available version instead.
+> ⚠️ Without version constraints, Terraform installs the latest available version by default. Automatic updates may introduce breaking changes. Lock your configuration to a specific provider version to ensure stable and predictable deployments.
 
-Here's why that's risky: if you or a teammate later runs `terraform init` on a different machine, using the exact same code, Terraform will again grab whatever the "latest" version is *at that time* — which could be newer than what you originally used. That newer version might behave differently, and could end up breaking your infrastructure without any obvious reason why.
+Here's why that matters: if you don't pin the version in your config, and you or a teammate later runs `terraform init` on a different machine, using the exact same code, Terraform will grab whatever the "latest" version is *at that time* — which could be newer than what you originally used. That newer version might behave differently, and could end up breaking your infrastructure without any obvious reason why.
 
-To avoid that, pin a version in a `required_providers` block like this:
+To avoid that, always pin a version in a `required_providers` block like this:
 
 ```hcl
 terraform {
