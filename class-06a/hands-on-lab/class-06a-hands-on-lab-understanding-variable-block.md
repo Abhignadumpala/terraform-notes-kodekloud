@@ -1,4 +1,4 @@
-# Class 6 Hands-On Lab: Variable Types in Practice
+# Class 6a-Hands-On Lab: Variable Types in Practice
 
 This lab covers three real-world scenarios with variables: using lists with different positions, sets with duplicate values, and type mismatches. The key learning is that **Terraform is forgiving — it silently fixes errors instead of rejecting them**.
 
