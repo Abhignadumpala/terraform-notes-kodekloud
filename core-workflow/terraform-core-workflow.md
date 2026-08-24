@@ -101,4 +101,4 @@ terraform apply  → Create/update infrastructure
 
 ---
 
-**Back to:** [Class 3 — Why Terraform](../class3-why-terraform.md)
+**Back to:** https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/module-01-introduction-to-infrastructure-as-code/module-01.3-why-terraform/why-terraform.md
