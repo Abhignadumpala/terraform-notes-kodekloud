@@ -1,4 +1,4 @@
-# Class 3 — Why Terraform
+# 1.3 — Why Terraform
 
 **Course:** KodeKloud — Terraform
 **Class:** 3
@@ -88,7 +88,7 @@ Every Terraform operation goes through three phases:
 
 **Important detail:** if something drifts from the defined state later (someone manually changes a setting in the console, for example), running `terraform apply` again will detect that and correct it back to match the config.
 
-📖 **For a detailed breakdown of this workflow** → [Terraform Core Workflow — init → plan → apply](./workflow/terraform-core-workflow.md)
+📖 **For a detailed breakdown of this workflow** → [Terraform Core Workflow — init → plan → apply](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/core-workflow/terraform-core-workflow.md#terraform-core-workflow--init--plan--apply)
 
 ---
 
@@ -117,7 +117,7 @@ Beyond the CLI I've been using, HashiCorp also offers:
 
 ![Terraform Cloud workspaces dashboard showing run status for two projects](images/10-terraform-cloud-enterprise.png)
 
-> 📖 **Read More** → [Terraform CLI vs Terraform Cloud](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/terraform-cli-vs-cloud.md)
+> 📖 **Read More** → [Terraform CLI vs Terraform Cloud](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/terraform-cli-vs-cloud.md#terraform-cli-vs-terraform-cloud)
 
 ---
 

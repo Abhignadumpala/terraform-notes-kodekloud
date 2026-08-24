@@ -1,4 +1,4 @@
-# CLASS-06b: Using Variables in Terraform
+# 3.6: Using Variables in Terraform
 
 > Master all techniques to pass input variables in Terraform including default values, command line input, environment variables, and variable definition precedence.
 

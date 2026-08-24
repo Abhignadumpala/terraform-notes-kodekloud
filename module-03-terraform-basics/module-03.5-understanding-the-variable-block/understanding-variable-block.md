@@ -1,4 +1,4 @@
-# Class 6a: Understanding the Variable Block
+# 3.5: Understanding the Variable Block
 
 This article explores the Terraform variable block, including variable definition, type constraints, and complex data structures for efficient infrastructure code.
 

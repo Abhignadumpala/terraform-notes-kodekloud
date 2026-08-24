@@ -1,4 +1,4 @@
-# Class 5: Using Terraform Providers
+# mmodule 3.1: Using Terraform Providers
 
 Providers are what let Terraform manage resources across different platforms — AWS, GCP, Azure, or something simple like the local filesystem. This is Terraform's plugin-based architecture: the core CLI doesn't know how to talk to any specific platform on its own, it relies entirely on a provider plugin to do that.
 

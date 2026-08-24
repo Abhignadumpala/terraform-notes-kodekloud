@@ -1,4 +1,4 @@
-# Class 2 — Types of IaC Tools
+#  1.2 — Types of IaC Tools
 
 **Course:** KodeKloud — Terraform
 **Class:** 2
