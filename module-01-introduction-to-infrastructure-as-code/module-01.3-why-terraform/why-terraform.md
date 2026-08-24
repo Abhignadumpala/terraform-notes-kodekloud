@@ -88,7 +88,7 @@ Every Terraform operation goes through three phases:
 
 **Important detail:** if something drifts from the defined state later (someone manually changes a setting in the console, for example), running `terraform apply` again will detect that and correct it back to match the config.
 
-📖 **For a detailed breakdown of this workflow** → [Terraform Core Workflow — init → plan → apply](./workflow/terraform-core-workflow.md)
+📖 **For a detailed breakdown of this workflow** → [Terraform Core Workflow — init → plan → apply](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/core-workflow/terraform-core-workflow.md#terraform-core-workflow--init--plan--apply)
 
 ---
 
