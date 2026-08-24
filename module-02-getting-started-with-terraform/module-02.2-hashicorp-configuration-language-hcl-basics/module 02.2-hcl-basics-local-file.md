@@ -1,4 +1,4 @@
-# Class 4b: HCL Basics — Creating a Local File Resource
+# module 2.2: HCL Basics — Creating a Local File Resource
 
 HCL (HashiCorp Configuration Language) files are made of **blocks** and **arguments**. Each block describes a piece of infrastructure you want Terraform to manage. Here's a hands-on walkthrough creating the simplest possible resource — a local file — to understand the core workflow.
 
