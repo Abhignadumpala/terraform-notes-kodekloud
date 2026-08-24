@@ -1,4 +1,4 @@
-# Class 4c: Update and Destroy Infrastructure
+# module 2.3: Update and Destroy Infrastructure
 
 Continuing from the local file resource created in Class 4b — now updating its configuration, then fully destroying it.
 
