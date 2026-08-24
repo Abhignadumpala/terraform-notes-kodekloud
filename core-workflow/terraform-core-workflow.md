@@ -101,4 +101,4 @@ terraform apply  → Create/update infrastructure
 
 ---
 
-**Back to why terraform :** https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/module-01-introduction-to-infrastructure-as-code/module-01.3-why-terraform/why-terraform.md
+**Back to why terraform :** (https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/core-workflow/terraform-core-workflow.md#terraform-core-workflow--init--plan--apply)
