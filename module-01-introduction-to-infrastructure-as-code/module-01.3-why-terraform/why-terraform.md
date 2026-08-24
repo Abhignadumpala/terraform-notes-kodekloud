@@ -1,4 +1,4 @@
-# Class 3 — Why Terraform
+# 1.3 — Why Terraform
 
 **Course:** KodeKloud — Terraform
 **Class:** 3
