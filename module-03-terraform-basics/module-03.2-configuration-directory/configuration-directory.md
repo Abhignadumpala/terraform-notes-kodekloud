@@ -1,4 +1,4 @@
-# Class 5a: The Terraform Configuration Directory
+# 3.2- The Terraform Configuration Directory
 
 This lesson covers the structure and naming conventions of a Terraform configuration directory, for better project organization and configuration management.
 
