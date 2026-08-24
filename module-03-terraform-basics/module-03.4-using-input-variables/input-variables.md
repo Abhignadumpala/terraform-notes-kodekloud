@@ -1,4 +1,4 @@
-# Class 6: Input Variables
+# 3.4: Input Variables
 
 Input variables make Terraform configurations more reusable and flexible by allowing you to parameterize values — instead of hard-coding the same strings in resource blocks, you define variables once and reference them everywhere they're needed.
 
