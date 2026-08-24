@@ -1,4 +1,4 @@
-# Class 4: Installing Terraform
+# module 2.1: Installing Terraform
 
 In this lesson, you'll learn how to install Terraform. Terraform is distributed as a single binary that you download and place in your system's PATH, then verify with a version check. Terraform supports Windows, macOS, and a range of Linux distributions — for this lesson, I'm installing on Ubuntu Linux with Terraform v1.15.8.
 
