@@ -1,4 +1,4 @@
-# Class 5b: Multiple Providers in One Config
+# 3.3: Multiple Providers in One Config
 
 Until now, every resource in my lab has used a single provider — `local`. This lesson introduces a second provider, `random`, alongside it, in the same `terraform-local-file` directory.
 
