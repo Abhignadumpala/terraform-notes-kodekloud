@@ -1,4 +1,4 @@
-# Class 1 — Challenges with Traditional IT Infrastructure (Traditional IT vs Cloud vs IaC)
+# 1.1 — Challenges with Traditional IT Infrastructure (Traditional IT vs Cloud vs IaC)
 
 **Course:** KodeKloud — Terraform
 **Class:** 1
