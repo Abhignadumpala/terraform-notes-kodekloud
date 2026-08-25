@@ -62,8 +62,8 @@ aws sts get-caller-identity
 
 ✅ If you see your IAM username, you're good to go!
 
-![AWS Credentials Setup](images/step-01-aws-credentials.png)
-![Verify Caller Identity](images/step-02-verify-credentials.png)
+![AWS Credentials Setup](images/step-01.png)
+![Verify Caller Identity](images/step-02.png)
 
 ---
 
@@ -111,7 +111,7 @@ EOF
 - Configures AWS region to us-east-1
 - This is the foundation for all AWS resources
 
-![Provider Configuration](images/step-03-provider-tf.png)
+![Provider Configuration](images/step-03.png)
 
 ---
 
@@ -172,7 +172,7 @@ EOF
 - Allows all outbound traffic
 - Tags it for easy identification
 
-![Security Group Configuration](images/step-04-security-group-tf.png)
+![Security Group Configuration](images/step-04.png)
 
 ---
 
@@ -218,8 +218,8 @@ vpc_security_group_ids = [aws_security_group.allow_ssh.id]  # Always current!
 - No manual updates needed
 - Terraform manages the dependency automatically
 
-![EC2 Instance with Resource Linking](images/step-05-ec2-instance-tf.png)
-![Resource Linking Highlighted](images/step-06-linking-highlighted.png)
+![EC2 Instance with Resource Linking](images/step-05.png)
+![Resource Linking Highlighted](images/step-06.png)
 
 ---
 
@@ -259,7 +259,7 @@ EOF
 - Instance Public IP (for SSH access)
 - Linked Security Group ID (proves the connection!)
 
-![Outputs Configuration](images/step-07-outputs-tf.png)
+![Outputs Configuration](images/step-07.png)
 
 ---
 
@@ -307,7 +307,7 @@ Terraform has been successfully initialized!
 
 ⏳ **This takes 1-5 minutes the first time** (downloads large provider file)
 
-![Terraform Init Output](images/step-08-terraform-init.png)
+![Terraform Init Output](images/step-08.png)
 
 ---
 
@@ -326,7 +326,7 @@ Success! The configuration is valid.
 
 ✅ This checks for syntax errors before applying
 
-![Terraform Validate Success](images/step-09-terraform-validate.png)
+![Terraform Validate Success](images/step-09.png)
 
 ---
 
@@ -365,8 +365,8 @@ terraform plan
 
 **Notice:** Terraform shows `aws_security_group.allow_ssh.id` - it knows they're linked!
 
-![Terraform Plan Output Part 1](images/step-10-terraform-plan-1.png)
-![Terraform Plan Output Part 2](images/step-10-terraform-plan-2.png)
+![Terraform Plan Output Part 1](images/step-10.png)
+![Terraform Plan Output Part 2](images/step-11.png)
 
 ---
 
@@ -412,8 +412,8 @@ linked_sg_id = [
 
 ✅ **Both resources created and linked!**
 
-![Terraform Apply Validation](images/step-11-terraform-apply-validate.png)
-![Terraform Apply Complete](images/step-12-terraform-apply-complete.png)
+![Terraform Apply Validation](images/step-12.png)
+![Terraform Apply Complete](images/step-13.png)
 
 ---
 
@@ -446,9 +446,9 @@ linked_sg_id = [
 
 ✅ **The instance is successfully linked to the security group!**
 
-![EC2 Instances Console](images/step-13-ec2-instances-console.png)
-![Security Group Details](images/step-14-security-group-details.png)
-![Instance Security Tab](images/step-15-instance-security-tab.png)
+![EC2 Instances Console](images/step-14.png)
+![Security Group Details](images/step-15.png)
+![Instance Security Tab](images/step-16.png)
 
 ---
 
@@ -491,7 +491,7 @@ Destroy complete! Resources: 2 destroyed.
 
 ✅ **All resources removed from AWS!**
 
-![Terraform Destroy Output](images/step-16-terraform-destroy.png)
+![Terraform Destroy Output](images/step-17.png)
 ![Destroy Complete](images/step-17-destroy-complete.png)
 
 ---
