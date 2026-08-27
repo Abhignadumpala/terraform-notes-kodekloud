@@ -52,15 +52,13 @@ Standard init, nothing special — just pulled in the `hashicorp/aws` provider (
 
 This is the important part. Even with no `depends_on` anywhere, `terraform plan` shows Terraform already knows the security group has to exist before the instance can reference its `id`. Looking at the plan output, `vpc_security_group_ids` shows up as `(known after apply)` on the instance — because that value depends on a resource that doesn't exist yet.
 
-![code side-by-side with terraform plan output](images/05-code-review-and-terraform-plan-start.png)
-
 Scrolling through the full plan — every attribute on `aws_instance.web_server` that isn't known yet is marked `(known after apply)`, exactly what I'd expect for a resource that hasn't been created:
 
-![terraform plan instance attributes](images/06-terraform-plan-instance-attributes.png)
+![terraform plan instance attributes](images/05-terraform-plan-instance-attributes.png)
 
 And the plan summary: 2 resources to add, 0 to change, 0 to destroy.
 
-![terraform plan summary — 2 to add](images/07-terraform-plan-summary.png)
+![terraform plan summary — 2 to add](images/06-terraform-plan-summary.png)
 
 ### 4. `terraform apply`
 
@@ -76,9 +74,9 @@ aws_instance.web_server: Creation complete after 14s [id=i-0a96121c5456a4f5d]
 
 **Security group first, EC2 instance second** — exactly what the implicit dependency graph said would happen. No instance can reference a security group ID that doesn't exist yet, so Terraform had no choice but to create the SG first.
 
-![terraform apply full plan output](images/08-terraform-apply-plan.png)
+![terraform apply full plan output](images/07-terraform-apply-plan.png)
 
-![terraform apply complete with outputs](images/09-terraform-apply-complete.png)
+![terraform apply complete with outputs](images/08-terraform-apply-complete.png)
 
 ### 5. Verifying with `terraform output`
 
@@ -87,21 +85,21 @@ instance_id       = "i-0a96121c5456a4f5d"
 instance_public_ip = "100.57.172.223"
 ```
 
-![terraform output](images/10-terraform-output.png)
+![terraform output](images/09-terraform-output.png)
 
 ### 6. Checking the AWS Console
 
 Instance is up and running, `2/2` status checks passed:
 
-![EC2 instance running in AWS console](images/11-aws-console-ec2-running.png)
+![EC2 instance running in AWS console](images/10-aws-console-ec2-running.png)
 
 Instance summary confirms the public IP and instance ID match what Terraform printed, and the attached security group is `web-sg-implicit-lab`:
 
-![EC2 instance summary in AWS console](images/12-aws-console-instance-summary.png)
+![EC2 instance summary in AWS console](images/11-aws-console-instance-summary.png)
 
 And the security group itself — port 80 and 443 inbound from `0.0.0.0/0`, matching what's in `security_group.tf`:
 
-![Security group inbound rules in AWS console](images/13-aws-console-security-group-inbound-rules.png)
+![Security group inbound rules in AWS console](images/12-aws-console-security-group-inbound-rules.png)
 
 ### 7. `terraform destroy` — watching the reverse order
 
@@ -120,13 +118,13 @@ Destroy complete! Resources: 2 destroyed.
 
 **Yes.** EC2 instance destroyed first, security group destroyed second — the reverse of creation. This makes sense: AWS won't let you delete a security group while an instance is still attached to it, so Terraform *has* to remove the instance first.
 
-![terraform destroy plan — instance marked for destruction](images/14-terraform-destroy-plan.png)
+![terraform destroy plan — instance marked for destruction](images/13-terraform-destroy-plan.png)
 
-![terraform destroy complete — reverse order confirmed](images/15-terraform-destroy-complete.png)
+![terraform destroy complete — reverse order confirmed](images/14-terraform-destroy-complete.png)
 
 Confirmed clean in the console afterward — no matching instances found:
 
-![No instances found after destroy](images/16-aws-console-no-instances-after-destroy.png)
+![No instances found after destroy](images/15-aws-console-no-instances-after-destroy.png)
 
 ---
 
