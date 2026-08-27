@@ -24,7 +24,21 @@ resource "aws_instance" "app_server" {
 }
 ```
 
-The instance already references `aws_iam_instance_profile.ec2_profile.name`, so Terraform would create the instance profile first *anyway* — that part is implicit. The reason I needed `depends_on` here is `aws_iam_role_policy.ec2_s3_read`: nothing on the instance resource references that policy directly (the instance only cares about the *profile*, not the *policy* attached to the role behind it). Without `depends_on`, Terraform could create the EC2 instance and attach the role before the S3-read policy is actually attached to that role — meaning the instance could boot for a moment with a role that has no permissions yet. Adding the explicit dependency forces the policy attachment to finish first.
+Why Part of It Works Automatically
+
+The instance references the instance profile (iam_instance_profile = aws_iam_instance_profile.ec2_profile.name), so Terraform automatically creates the instance profile first. That part is implicit — Terraform detects it without you needing to say anything.
+
+The Hidden Problem
+
+But the instance doesn't directly reference the S3 policy. It only cares about the profile, not what's attached to the role behind it. Without depends_on, Terraform could create the EC2 instance before the S3 policy is fully attached to the role.
+
+What Goes Wrong
+
+The instance would boot with a role that has no permissions yet. The policy would attach later, but by then the instance is already running without permissions.
+
+How depends_on Fixes It
+
+Adding depends_on forces the policy attachment to finish first. This guarantees the instance has proper permissions when it starts.
 
 Files: `provider.tf`, `iam_role.tf`, `ec2_instance.tf`, `outputs.tf`.
 
