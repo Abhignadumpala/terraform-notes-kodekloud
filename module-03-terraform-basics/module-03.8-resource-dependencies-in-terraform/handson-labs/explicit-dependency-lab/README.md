@@ -23,20 +23,20 @@ resource "aws_instance" "app_server" {
   }
 }
 ```
-
-Why Part of It Works Automatically
+### Why Part of It Works Automatically
 
 The instance references the instance profile (iam_instance_profile = aws_iam_instance_profile.ec2_profile.name), so Terraform automatically creates the instance profile first. That part is implicit — Terraform detects it without you needing to say anything.
 
-The Hidden Problem
+**The Hidden Problem**
 
 But the instance doesn't directly reference the S3 policy. It only cares about the profile, not what's attached to the role behind it. Without depends_on, Terraform could create the EC2 instance before the S3 policy is fully attached to the role.
 
-What Goes Wrong
+
+**What Goes Wrong**
 
 The instance would boot with a role that has no permissions yet. The policy would attach later, but by then the instance is already running without permissions.
 
-How depends_on Fixes It
+**How `depends_on` Fixes It**
 
 Adding depends_on forces the policy attachment to finish first. This guarantees the instance has proper permissions when it starts.
 
