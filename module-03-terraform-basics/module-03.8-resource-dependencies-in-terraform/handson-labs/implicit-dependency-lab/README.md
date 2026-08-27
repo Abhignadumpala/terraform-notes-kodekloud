@@ -95,17 +95,13 @@ Instance is up and running, `2/2` status checks passed:
 
 ![EC2 instance running in AWS console](images/11-aws-console-ec2-running.png)
 
-Instance summary confirms the public IP matches what Terraform printed, and the attached security group is `web-sg-implicit-lab`:
+Instance summary confirms the public IP and instance ID match what Terraform printed, and the attached security group is `web-sg-implicit-lab`:
 
 ![EC2 instance summary in AWS console](images/12-aws-console-instance-summary.png)
 
-Double-checked the instance ID and public IP against my terminal output side-by-side — everything lines up:
-
-![Instance detail next to terraform output in terminal](images/13-aws-console-instance-and-terraform-output.png)
-
 And the security group itself — port 80 and 443 inbound from `0.0.0.0/0`, matching what's in `security_group.tf`:
 
-![Security group inbound rules in AWS console](images/14-aws-console-security-group-inbound-rules.png)
+![Security group inbound rules in AWS console](images/13-aws-console-security-group-inbound-rules.png)
 
 ### 7. `terraform destroy` — watching the reverse order
 
@@ -124,13 +120,13 @@ Destroy complete! Resources: 2 destroyed.
 
 **Yes.** EC2 instance destroyed first, security group destroyed second — the reverse of creation. This makes sense: AWS won't let you delete a security group while an instance is still attached to it, so Terraform *has* to remove the instance first.
 
-![terraform destroy plan — instance marked for destruction](images/15-terraform-destroy-plan.png)
+![terraform destroy plan — instance marked for destruction](images/14-terraform-destroy-plan.png)
 
-![terraform destroy complete — reverse order confirmed](images/16-terraform-destroy-complete.png)
+![terraform destroy complete — reverse order confirmed](images/15-terraform-destroy-complete.png)
 
 Confirmed clean in the console afterward — no matching instances found:
 
-![No instances found after destroy](images/17-aws-console-no-instances-after-destroy.png)
+![No instances found after destroy](images/16-aws-console-no-instances-after-destroy.png)
 
 ---
 
