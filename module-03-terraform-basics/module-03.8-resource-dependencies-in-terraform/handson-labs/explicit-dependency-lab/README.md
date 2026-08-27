@@ -110,6 +110,32 @@ And the policy itself — `s3:ListAllMyBuckets` on `Resource: "*"`, exactly what
 
 ![IAM policy JSON in AWS console](images/13-aws-console-iam-policy-json.png)
 
+### 7. `terraform destroy` — watching the reverse order
+
+Same check as the implicit lab: does the teardown order mirror the creation order in reverse?
+
+```
+aws_instance.app_server: Destroying... [id=i-00f4b86f2213781df]
+aws_instance.app_server: Still destroying... [00m30s elapsed]
+aws_instance.app_server: Destruction complete after 31s
+aws_iam_role_policy.ec2_s3_read: Destroying... [id=ec2-explicit-dependency-role:ec2-s3-read-only-policy]
+aws_iam_instance_profile.ec2_profile: Destroying... [id=ec2-explicit-dependency-profile]
+aws_iam_role_policy.ec2_s3_read: Destruction complete after 1s
+aws_iam_instance_profile.ec2_profile: Destruction complete after 1s
+aws_iam_role.ec2_role: Destroying... [id=ec2-explicit-dependency-role]
+aws_iam_role.ec2_role: Destruction complete after 1s
+
+Destroy complete! Resources: 4 destroyed.
+```
+
+**Yes, exact reverse of creation.** EC2 instance first (it's the one thing depending on everything else, both implicitly and explicitly), then the role policy and instance profile in parallel (nothing depends on them anymore once the instance is gone), and the IAM role last (it can't be deleted while the policy is still attached to it). The explicit `depends_on` I added for creation didn't need a mirror `depends_on` for deletion — Terraform's dependency graph is bidirectional, so the same graph that ordered creation forward also orders destruction backward.
+
+![terraform destroy plan — instance, role, policy, and profile marked for destruction](images/14-terraform-destroy-plan.png)
+
+![terraform destroy plan continued — instance attributes and destroy confirmation prompt](images/15-terraform-destroy-plan-continued.png)
+
+![terraform destroy complete — instance first, then policy/profile, then role last](images/16-terraform-destroy-complete.png)
+
 ---
 
 ## What I Took Away From This
@@ -119,7 +145,8 @@ And the policy itself — `s3:ListAllMyBuckets` on `Resource: "*"`, exactly what
   - **Explicit** — `depends_on = [aws_iam_role_policy.ec2_s3_read]` (no direct reference exists between the instance and the policy, so I had to spell it out).
 - The rule of thumb from the main notes held up in practice: reach for `depends_on` specifically for IAM policy attachments and other "hidden" relationships that don't show up as a resource attribute reference.
 - Creation order matched the dependency graph exactly: role → (policy + profile in parallel) → instance.
+- Destruction mirrored it exactly in reverse: instance → (policy + profile in parallel) → role. Same dependency graph, walked backward — one `depends_on` on creation was enough, I didn't need a separate one for teardown.
 
-> ⚠️ **Cleanup status:** unlike the implicit-dependency lab, I didn't capture a `terraform destroy` run for this one — the last screenshot in the walkthrough is still me inspecting the IAM role/policy in the console, not tearing it down. If these resources (`app-server-explicit-lab` EC2 instance, `ec2-explicit-dependency-role` IAM role/policy/profile) are still running in AWS, run `terraform destroy` from inside `explicit-dependency-code/` to clean them up.
+Lab was destroyed cleanly at the end — no resources left running in AWS from this one.
 
 Back to [explicit dependencies in the main notes](../../README.md#explicit-dependencies).
