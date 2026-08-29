@@ -236,9 +236,10 @@ Inspecting `terraform.tfstate` after the first apply (`cat terraform.tfstate | j
 | **lineage** | Unique id tracking this state file across backups |
 | **resources** | Every data source and managed resource — data sources included, tagged `"mode": "data"` |
 
-The `data.aws_ami.amazon_linux_2` entry is recorded the same way as the managed resources, just tagged `"mode": "data"` instead of `"mode": "managed"`. That's also why a data source shows `Reading...` on every subsequent plan/apply rather than just `Refreshing state...` — unlike a managed resource, it re-resolves from AWS each run instead of only checking that what's in state still exists.
+A couple of plain-English things worth knowing about this file:
 
-`terraform.tfstate.backup` holds the state from just before the most recent write — one `serial` behind the current file. This is the single source of truth Terraform consults on every `plan`/`apply` to decide what, if anything, needs to change.
+- **Data sources get saved here too**, just marked `"mode": "data"` instead of `"mode": "managed"`. That's why the AMI lookup shows `Reading...` every single time you run `plan` or `apply`, instead of just `Refreshing state...` like the other resources — Terraform looks the data source up fresh every run instead of only checking that it still exists.
+- **`terraform.tfstate.backup` is just a copy of the previous state** — think of it like an undo file, holding whatever was in `terraform.tfstate` right before the last change. Terraform itself always reads the current `terraform.tfstate`, not the backup, to decide what to create, change, or leave alone.
 
 ---
 
@@ -351,7 +352,7 @@ The interesting part is what it decides to do with the *existing* instance:
 Plan: 2 to add, 1 to change, 0 to destroy.
 ```
 
-**This surprised me.** A lot of Terraform material (including my own earlier draft of these notes) says attaching `iam_instance_profile` to an already-running instance forces a replacement, because it can't be set on a live instance. That's not what actually happened here — Terraform shows `~ update in-place`, not `-/+ replace`, and the plan is `2 to add, 1 to change, 0 to destroy` with zero destructions. The current AWS provider evidently supports attaching an instance profile to a running instance via the `associate-iam-instance-profile` API instead of forcing a recreate. Worth remembering: whether an attribute forces replacement depends on the provider version, not just general Terraform lore — always read the actual plan output rather than assuming.
+So here's what happened: I added the IAM instance profile to `main.tf` and ran `plan` again. Terraform did **not** plan to delete and recreate the EC2 instance — it planned to just update it in place (`~ update in-place`, not `-/+ replace`), keeping the same instance and only adding the one new attribute.
 
 ### Step 3: Apply the Change
 
@@ -375,10 +376,7 @@ aws_instance.web_server: Modifications complete after 16s [id=i-077f37d5b0850630
 Apply complete! Resources: 2 added, 1 changed, 0 destroyed.
 ```
 
-What happened:
-- IAM role created: `ec2-web-server-role`
-- Instance profile created: `ec2-web-server-profile`
-- The **same** EC2 instance, `i-077f37d5b08506306`, was modified in place — no destroy, no new instance id
+I observed Terraform create the IAM role and instance profile, then modify the existing EC2 instance to attach that new role — same instance ID (`i-077f37d5b08506306`), same AMI, nothing rebuilt. Only the `iam_instance_profile` attribute changed.
 
 ### Step 4: Verify the State File Was Updated
 
@@ -472,75 +470,21 @@ Cross-checking the state file against the actual console — the instance still 
 
 ---
 
-## How State Management Worked Here
+## Summary
 
-```
-1. Terraform read terraform.tfstate.backup
-   └─ Found: EC2 instance i-077f37d5b08506306, iam_instance_profile = ""
+**First apply — starting from nothing:**
+1. No state file existed yet, so Terraform knew nothing about my AWS account.
+2. I ran `apply`, and Terraform created 2 resources — the security group and the EC2 instance.
+3. Terraform wrote `terraform.tfstate` for the first time, recording their real AWS ids (`sg-03ee8ffc10cd43d96`, `i-077f37d5b08506306`).
 
-2. Terraform read the updated main.tf
-   └─ Saw: aws_instance.web_server should have iam_instance_profile = "ec2-web-server-profile"
+**Second apply — after adding the IAM role and instance profile:**
+1. Terraform read the existing `terraform.tfstate` to see what already existed.
+2. It compared that against my updated `main.tf`.
+3. It created the 2 new resources — the IAM role and the instance profile.
+4. It updated the existing EC2 instance in place to attach the new profile — same instance ID as before, nothing destroyed.
+5. Terraform wrote the updated state file, and `serial` went up (`3` → `7`).
 
-3. Terraform compared old state vs. new config
-   └─ Determined the AWS provider can attach this via an in-place API call
-   └─ No replacement needed — unlike some other forces-replacement attributes (AMI, subnet)
-
-4. Terraform built the plan
-   └─ 2 to add (role, profile), 1 to change (instance), 0 to destroy
-
-5. I approved with "yes"
-
-6. Terraform executed
-   └─ Created the role and profile
-   └─ Modified the existing instance in place
-   └─ Wrote the updated state, serial incremented
-```
-
-### Changes Comparison Table
-
-| Item | Backup (before) | Current (after) | Changed? |
-|------|------------------|------------------|----------|
-| **serial** | 3 | 7 | incremented |
-| **aws_ami** | `ami-0c3a3c65a049b6922` | `ami-0c3a3c65a049b6922` | unchanged |
-| **aws_security_group** | `sg-03ee8ffc10cd43d96` | `sg-03ee8ffc10cd43d96` | unchanged |
-| **aws_iam_role** | missing | `ec2-web-server-role` | new |
-| **aws_iam_instance_profile** | missing | `ec2-web-server-profile` | new |
-| **aws_instance id** | `i-077f37d5b08506306` | `i-077f37d5b08506306` | **same** — updated in place |
-| **iam_instance_profile** | `""` (empty) | `"ec2-web-server-profile"` | now attached |
-
----
-
-## Why State File Is Crucial
-
-**Without a state file**, re-running `apply` after adding the IAM resources would have had no way to know the security group and instance already exist — it would try to create all five resources from scratch and AWS would reject the duplicate security group name.
-
-**With the state file**, Terraform:
-- Knew exactly what already existed (3 resources)
-- Compared that against the new config (5 resources)
-- Worked out precisely what was new (2) vs. what needed changing (1) vs. what was already correct
-- Updated only the instance's `iam_instance_profile`, leaving everything else alone
-- Recorded the new resource ids and bumped `serial`
-
-That's the whole point of state: without it, Terraform is blind to what it already built.
-
----
-
-## Key Lab Observations
-
-1. **The state file only appears after the first apply.** Before it, there's no `terraform.tfstate` — Terraform only has the config and whatever it can read live from AWS.
-2. **State records real AWS ids, not placeholders.** Security group `sg-03ee8ffc10cd43d96`, instance `i-077f37d5b08506306`, its actual IPs — these become the source of truth once written.
-3. **Data sources live in state too.** `data.aws_ami.amazon_linux_2` is stored in the same shape as a managed resource, just tagged `"mode": "data"`.
-4. **Not every attribute change forces a replacement.** `iam_instance_profile` updated in place here — the provider supports attaching it live. Attributes like the AMI or subnet id generally still force a rebuild. Trust the plan output over general rules of thumb.
-5. **A resource that exists in state isn't necessarily wired up in config.** `aws_security_group.web_sg` was created and tracked in state, but the instance never referenced it, so it silently used the VPC default security group instead. State tracks what Terraform manages — it doesn't validate that your resources are actually connected the way you intended.
-6. **`terraform.tfstate.backup` is your one-step-back safety net.** It's the state from immediately before the last write, letting you diff exactly what one apply changed.
-
-### Cleanup
-
-```bash
-terraform destroy
-```
-
-Deletes the EC2 instance, security group, IAM role, and instance profile, and updates `terraform.tfstate` accordingly.
+Without that state file, the second apply would have had no memory of the first one — Terraform would have tried to create everything again from scratch instead of just adding what was new.
 
 ---
 
@@ -558,11 +502,13 @@ Deletes the EC2 instance, security group, IAM role, and instance profile, and up
 
 ---
 
-## Summary
+## Cleanup
 
-This lesson walked through how Terraform leverages a state file — created on the first successful apply — to track and manage real AWS infrastructure. The first apply created two resources and wrote `terraform.tfstate` for the first time. Editing `main.tf` to add an IAM role and instance profile, then applying again, showed Terraform read the existing state, compared it to the new config, and made exactly the changes needed: two new resources created, one existing resource updated in place, nothing destroyed. Comparing `terraform.tfstate.backup` against the new `terraform.tfstate` (serial `3` → `7`) made that diff concrete — same instance id throughout, just a new attribute recorded.
+```bash
+terraform destroy
+```
 
-The state file is what let Terraform do this precisely instead of guessing: without it, every apply would be a blind re-creation attempt.
+Deletes the EC2 instance, security group, IAM role, and instance profile, and updates `terraform.tfstate` accordingly.
 
 ---
 
