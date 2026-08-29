@@ -419,7 +419,7 @@ Two new resource types (`aws_iam_role`, `aws_iam_instance_profile`), same three 
 
 ### Step 6: Verify in the AWS Console
 
-Cross-checking the state file against the actual console — the instance still shows the original id, now with the role attached, and (as noted above) the *default* security group rather than `web-security-group`:
+Cross-checking the state file against the actual console — the instance still shows the original id, now with the role attached. The security group column shows the *default* security group, not `web-security-group` — because we missed attaching the security group we defined in the config to the `aws_instance` block. Since we never told the instance which security group to use, AWS just fell back to the default one:
 
 ![EC2 instance summary for i-077f37d5b08506306 (my-web-server) showing IAM role ec2-web-server-role and security group sg-0aed90982121d95d8 (default)](images/14-aws-console-ec2-instance-summary.png)
 ![IAM console showing the ec2-web-server-role summary with its ARN and instance profile ARN](images/15-aws-console-iam-role-details.png)
