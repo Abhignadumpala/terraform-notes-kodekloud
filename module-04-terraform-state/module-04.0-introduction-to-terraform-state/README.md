@@ -377,9 +377,26 @@ Deletes the EC2 instance and security group, updates `terraform.tfstate`, and ke
 
 ## Updating the Configuration
 
-Consider updating the configuration in `main.tf` to add an IAM role for the EC2 instance. This is a separate variant of the lab — [`hands-on-lab/updated-with-iam-role/`](hands-on-lab/updated-with-iam-role/) — applied in its own directory/state, still using a hardcoded `var.ami_id` rather than the data source above (kept simple on purpose, to isolate this lesson's focus on the IAM role forcing a replacement):
+Consider updating the configuration in `main.tf` to add an IAM role for the EC2 instance. This is a separate variant of the lab — [`hands-on-lab/updated-with-iam-role/`](hands-on-lab/updated-with-iam-role/) — applied in its own directory/state.
+
+> I originally wrote this variant with the same hardcoded `var.ami_id` I'd used before switching `initial-infrastructure/` over to a data source, kept simple on purpose so the lesson's focus stayed on the IAM role forcing a replacement. Since that hardcoded AMI carries the same deprecation risk here, I went back and applied the same `data "aws_ami" "amazon_linux_2"` lookup to this variant too — `variables.tf` here now only declares `instance_type`, the `ami_id` variable is gone. While I was in there I also caught a real bug: `iam_instance_profile` on `aws_instance` expects the *name of an instance profile*, not an IAM role name — passing `aws_iam_role.ec2_role.name` directly would fail against the AWS API. The fix is a separate `aws_iam_instance_profile` resource that wraps the role.
 
 ```hcl
+data "aws_ami" "amazon_linux_2" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_iam_role" "ec2_role" {
   name = "ec2-web-server-role"
 
@@ -397,10 +414,15 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "ec2-web-server-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
 resource "aws_instance" "web_server" {
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  iam_instance_profile = aws_iam_role.ec2_role.name
+  ami                  = data.aws_ami.amazon_linux_2.id
+  instance_type        = var.instance_type
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
     Name = "my-web-server"
@@ -412,19 +434,23 @@ After this change, running `terraform apply` causes Terraform to refresh the sta
 
 ```bash
 $ terraform apply
+data.aws_ami.amazon_linux_2: Reading...
 aws_security_group.web_sg: Refreshing state... [id=sg-0987654321fedcba0]
+data.aws_ami.amazon_linux_2: Read complete after 1s [id=ami-0c3a3c65a049b6922]
 aws_instance.web_server: Refreshing state... [id=i-0c55b159cbfafe1f0]
 aws_iam_role.ec2_role: Creating...
 aws_iam_role.ec2_role: Creation complete after 1s [id=ec2-web-server-role]
+aws_iam_instance_profile.ec2_profile: Creating...
+aws_iam_instance_profile.ec2_profile: Creation complete after 1s [id=ec2-web-server-profile]
 
 Terraform will perform the following actions:
 
   # aws_instance.web_server must be replaced
   -/+ resource "aws_instance" "web_server" {
-        ami                 = "ami-0c55b159cbfafe1f0"
-        instance_type       = "t2.micro"
-      ~ id                  = "i-0c55b159cbfafe1f0" -> (known after apply)
-      + iam_instance_profile = "ec2-web-server-role" # forces replacement
+        ami                   = "ami-0c3a3c65a049b6922"
+        instance_type         = "t2.micro"
+      ~ id                    = "i-0c55b159cbfafe1f0" -> (known after apply)
+      + iam_instance_profile  = "ec2-web-server-profile" # forces replacement
         tags = {
             "Name" = "my-web-server"
           }
@@ -441,10 +467,10 @@ aws_instance.web_server: Destruction complete after 3s
 aws_instance.web_server: Creating...
 aws_instance.web_server: Creation complete after 30s [id=i-1a2b3c4d5e6f7g8h9]
 
-Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
+Apply complete! Resources: 3 added, 0 changed, 1 destroyed.
 ```
 
-After applying these changes, Terraform deletes the old instance and creates a new one with a different unique ID. The updated `terraform.tfstate` now reflects the new state with the IAM role attached:
+After applying these changes, Terraform deletes the old instance and creates a new one with a different unique ID. The updated `terraform.tfstate` now reflects the new state with the AMI data source, IAM role, and instance profile:
 
 ```json
 {
@@ -454,6 +480,22 @@ After applying these changes, Terraform deletes the old instance and creates a n
   "lineage": "e35dde72-a943-de50-3c8b-1df8986e5a31",
   "outputs": {},
   "resources": [
+    {
+      "mode": "data",
+      "type": "aws_ami",
+      "name": "amazon_linux_2",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "ami-0c3a3c65a049b6922",
+            "architecture": "x86_64",
+            "owner_id": "137112412989"
+          }
+        }
+      ]
+    },
     {
       "mode": "managed",
       "type": "aws_iam_role",
@@ -472,6 +514,23 @@ After applying these changes, Terraform deletes the old instance and creates a n
     },
     {
       "mode": "managed",
+      "type": "aws_iam_instance_profile",
+      "name": "ec2_profile",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:iam::123456789:instance-profile/ec2-web-server-profile",
+            "id": "ec2-web-server-profile",
+            "name": "ec2-web-server-profile",
+            "role": "ec2-web-server-role"
+          }
+        }
+      ]
+    },
+    {
+      "mode": "managed",
       "type": "aws_instance",
       "name": "web_server",
       "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
@@ -479,9 +538,9 @@ After applying these changes, Terraform deletes the old instance and creates a n
         {
           "schema_version": 1,
           "attributes": {
-            "ami": "ami-0c55b159cbfafe1f0",
+            "ami": "ami-0c3a3c65a049b6922",
             "id": "i-1a2b3c4d5e6f7g8h9",
-            "iam_instance_profile": "ec2-web-server-role",
+            "iam_instance_profile": "ec2-web-server-profile",
             "instance_type": "t2.micro",
             "private_ip": "10.0.1.55",
             "public_ip": "54.234.12.34",
