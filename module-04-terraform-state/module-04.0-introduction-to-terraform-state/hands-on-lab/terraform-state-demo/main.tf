@@ -13,13 +13,28 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
-resource "aws_instance" "web_server" {
-  ami           = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
+# NEW: IAM Role
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2-web-server-role"
 
-  tags = {
-    Name = "my-web-server"
-  }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# NEW: Instance Profile
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "ec2-web-server-profile"
+  role = aws_iam_role.ec2_role.name
 }
 
 resource "aws_security_group" "web_sg" {
@@ -38,5 +53,16 @@ resource "aws_security_group" "web_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# MODIFIED: Added iam_instance_profile
+resource "aws_instance" "web_server" {
+  ami                  = data.aws_ami.amazon_linux_2.id
+  instance_type        = var.instance_type
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name  # ADDED THIS!
+
+  tags = {
+    Name = "my-web-server"
   }
 }
