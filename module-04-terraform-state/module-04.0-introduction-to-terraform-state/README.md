@@ -389,51 +389,7 @@ $ terraform show
 
 ![ls showing all five files, then terraform show printing the refreshed aws_ami data source attributes](images/12-ls-state-backup-and-terraform-show-updated.png)
 
-### Step 5: Compare Backup vs. Current State
-
-```bash
-echo "=== OLD State (backup) serial ==="
-cat terraform.tfstate.backup | jq '.serial'
-
-echo "=== NEW State (current) serial ==="
-cat terraform.tfstate | jq '.serial'
-```
-
-![shell output: OLD State (backup) serial = 3, NEW State (current) serial = 7](images/13-compare-state-serials.png)
-
-```
-=== OLD State (backup) serial ===
-3
-
-=== NEW State (current) serial ===
-7
-```
-
-`serial` jumped from `3` to `7`, not `1` to `2` — every `plan` refresh and every `apply` I ran while iterating on this lab bumped it, not just the one "real" change.
-
-### Step 6: Compare the EC2 Instance's IAM Profile
-
-```bash
-echo "=== OLD EC2 Instance Profile (backup) ==="
-cat terraform.tfstate.backup | jq '.resources[] | select(.type=="aws_instance") | .instances[0].attributes.iam_instance_profile'
-
-echo "=== NEW EC2 Instance Profile (current) ==="
-cat terraform.tfstate | jq '.resources[] | select(.type=="aws_instance") | .instances[0].attributes.iam_instance_profile'
-```
-
-![shell output: OLD EC2 Instance Profile (backup) is empty string, NEW EC2 Instance Profile (current) is ec2-web-server-profile](images/14-compare-instance-profile-before-after.png)
-
-```
-=== OLD EC2 Instance Profile (backup) ===
-""
-
-=== NEW EC2 Instance Profile (current) ===
-"ec2-web-server-profile"
-```
-
-Same instance id in both files (`i-077f37d5b08506306`) — only the `iam_instance_profile` attribute changed.
-
-### Step 7: Compare Resource Types
+### Step 5: Compare Resource Types
 
 ```bash
 echo "=== Resources in OLD State (backup) ==="
@@ -443,7 +399,7 @@ echo "=== Resources in NEW State (current) ==="
 cat terraform.tfstate | jq '.resources[] | .type' | sort | uniq
 ```
 
-![shell output listing aws_ami, aws_instance, aws_security_group in the OLD state, and aws_ami, aws_iam_instance_profile, aws_iam_role, aws_instance, aws_security_group in the NEW state](images/15-compare-resource-types-before-after.png)
+![shell output listing aws_ami, aws_instance, aws_security_group in the OLD state, and aws_ami, aws_iam_instance_profile, aws_iam_role, aws_instance, aws_security_group in the NEW state](images/13-compare-resource-types-before-after.png)
 
 ```
 === Resources in OLD State (backup) ===
@@ -461,12 +417,12 @@ cat terraform.tfstate | jq '.resources[] | .type' | sort | uniq
 
 Two new resource types (`aws_iam_role`, `aws_iam_instance_profile`), same three from before — no `aws_instance` entry was duplicated or replaced, confirming the in-place update.
 
-### Step 8: Verify in the AWS Console
+### Step 6: Verify in the AWS Console
 
 Cross-checking the state file against the actual console — the instance still shows the original id, now with the role attached, and (as noted above) the *default* security group rather than `web-security-group`:
 
-![EC2 instance summary for i-077f37d5b08506306 (my-web-server) showing IAM role ec2-web-server-role and security group sg-0aed90982121d95d8 (default)](images/16-aws-console-ec2-instance-summary.png)
-![IAM console showing the ec2-web-server-role summary with its ARN and instance profile ARN](images/17-aws-console-iam-role-details.png)
+![EC2 instance summary for i-077f37d5b08506306 (my-web-server) showing IAM role ec2-web-server-role and security group sg-0aed90982121d95d8 (default)](images/14-aws-console-ec2-instance-summary.png)
+![IAM console showing the ec2-web-server-role summary with its ARN and instance profile ARN](images/15-aws-console-iam-role-details.png)
 
 ---
 
