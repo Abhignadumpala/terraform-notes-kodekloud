@@ -14,10 +14,10 @@ Terraform state is a record of all the infrastructure Terraform has created. It 
 
 ## Terraform Workflow Overview
 
-My actual project directory, `initial-infrastructure`, contains the following files:
+My actual project directory, `terraform-state-demo`, contains the following files:
 
 ```bash
-$ ls initial-infrastructure
+$ ls terraform-state-demo
 main.tf  variables.tf  provider.tf
 ```
 
@@ -95,7 +95,7 @@ provider "aws" {
 }
 ```
 
-Here's my actual lab directory — [`hands-on-lab/initial-infrastructure/`](hands-on-lab/initial-infrastructure/) — with these three files:
+Here's my actual lab directory — [`hands-on-lab/terraform-state-demo/`](hands-on-lab/terraform-state-demo/) — with these three files:
 
 ![cat provider.tf and cat main.tf, showing the aws_ami data source and both resources](images/01-cat-provider-and-main-tf.png)
 ![cat main.tf finishing with the security group, then cat variables.tf showing only instance_type](images/02-cat-main-tf-end-and-variables-tf.png)
@@ -377,7 +377,7 @@ Deletes the EC2 instance and security group, updates `terraform.tfstate`, and ke
 
 ## Updating the Configuration
 
-Consider updating the configuration in `main.tf` to add an IAM role for the EC2 instance. This is a separate variant of the lab — [`hands-on-lab/updated-with-iam-role/`](hands-on-lab/updated-with-iam-role/) — applied in its own directory/state.
+Consider updating the configuration in `main.tf` to add an IAM role for the EC2 instance. I make this change in place, in the same [`hands-on-lab/terraform-state-demo/`](hands-on-lab/terraform-state-demo/) directory I already applied above — so the existing state file is what gets refreshed and updated, not a fresh one.
 
 ```hcl
 data "aws_ami" "amazon_linux_2" {
@@ -591,10 +591,10 @@ Managing your Terraform state is crucial for ensuring consistent and predictable
 
 ## Hands-On Lab
 
-The [`hands-on-lab/`](hands-on-lab/) folder holds the runnable `.tf` files for both variants covered above:
+The [`hands-on-lab/terraform-state-demo/`](hands-on-lab/terraform-state-demo/) folder holds the runnable `.tf` files for both stages covered above, applied one after another in this single directory so they share one state file:
 
-- [`initial-infrastructure/`](hands-on-lab/initial-infrastructure/) — the starting config (security group + EC2 instance, AMI resolved via a `data "aws_ami"` lookup). Run `terraform init`, `terraform plan`, and `terraform apply` here first, then `apply` again to see "No changes" — the full walkthrough with screenshots is above.
-- [`updated-with-iam-role/`](hands-on-lab/updated-with-iam-role/) — the same config with the IAM role added. Apply this next (in its own directory/state) to see Terraform force-replace the EC2 instance and watch `serial` bump in the state file.
+1. Starting config (security group + EC2 instance, AMI resolved via a `data "aws_ami"` lookup). Run `terraform init`, `terraform plan`, and `terraform apply` here first, then `apply` again to see "No changes" — the full walkthrough with screenshots is above.
+2. Edit `main.tf` in place to add the IAM role and instance profile, then `apply` again in the same directory to see Terraform force-replace the EC2 instance and watch `serial` bump in the state file.
 
 ---
 
