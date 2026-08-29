@@ -14,10 +14,10 @@ Terraform state is a record of all the infrastructure Terraform has created. It 
 
 ## Terraform Workflow Overview
 
-Imagine you have a project directory named "terraform-aws-project" containing the following files:
+My actual project directory, `initial-infrastructure`, contains the following files:
 
 ```bash
-$ ls terraform-aws-project
+$ ls initial-infrastructure
 main.tf  variables.tf  provider.tf
 ```
 
@@ -378,8 +378,6 @@ Deletes the EC2 instance and security group, updates `terraform.tfstate`, and ke
 ## Updating the Configuration
 
 Consider updating the configuration in `main.tf` to add an IAM role for the EC2 instance. This is a separate variant of the lab — [`hands-on-lab/updated-with-iam-role/`](hands-on-lab/updated-with-iam-role/) — applied in its own directory/state.
-
-> I originally wrote this variant with the same hardcoded `var.ami_id` I'd used before switching `initial-infrastructure/` over to a data source, kept simple on purpose so the lesson's focus stayed on the IAM role forcing a replacement. Since that hardcoded AMI carries the same deprecation risk here, I went back and applied the same `data "aws_ami" "amazon_linux_2"` lookup to this variant too — `variables.tf` here now only declares `instance_type`, the `ami_id` variable is gone. While I was in there I also caught a real bug: `iam_instance_profile` on `aws_instance` expects the *name of an instance profile*, not an IAM role name — passing `aws_iam_role.ec2_role.name` directly would fail against the AWS API. The fix is a separate `aws_iam_instance_profile` resource that wraps the role.
 
 ```hcl
 data "aws_ami" "amazon_linux_2" {
