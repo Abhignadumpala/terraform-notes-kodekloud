@@ -309,10 +309,11 @@ resource "aws_security_group" "web_sg" {
 
 # MODIFIED: Added iam_instance_profile
 resource "aws_instance" "web_server" {
-  ami                  = data.aws_ami.amazon_linux_2.id
-  instance_type        = var.instance_type
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name  # ADDED THIS!
-
+  ami                    = data.aws_ami.amazon_linux_2.id
+  instance_type          = var.instance_type
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name  # ✅ Role
+  vpc_security_group_ids = [aws_security_group.web_sg.id]            # ✅ SG
+  
   tags = {
     Name = "my-web-server"
   }
