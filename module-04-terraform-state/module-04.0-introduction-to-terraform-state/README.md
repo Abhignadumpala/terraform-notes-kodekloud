@@ -165,7 +165,9 @@ Upon confirmation, Terraform:
 - Created the EC2 instance: `i-077f37d5b08506306`
 - Wrote `terraform.tfstate` for the first time
 
-> **Real gotcha I noticed:** `aws_security_group.web_sg` gets created, but `aws_instance.web_server` never actually references it — there's no `vpc_security_group_ids` or `security_groups` argument on the instance. So the security group exists in AWS and in state, but the instance just falls back to the VPC's **default** security group instead. I confirmed this later in the state file — the instance's `vpc_security_group_ids` is a completely different id (`sg-0aed90982121d95d8`, the default SG) than `web_sg`'s own id (`sg-03ee8ffc10cd43d96`). Terraform doesn't warn about this — an unreferenced resource is still a perfectly valid plan. This is a config bug, not a state bug, but it's the kind of thing that's easy to miss unless you cross-check the state file against what you actually intended.
+> **⚠️ Real gotcha:** I created a security group but forgot to attach it to the instance. Terraform didn't warn me, but the state file revealed it instantly.
+> 
+> 📌 **See:** [Troubleshooting: Security Group Not Attached](../troubleshooting-notes/module-04.0-sg-attachment.md)
 
 ### Step 4: Verify the State File Appeared
 
