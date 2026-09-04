@@ -4,6 +4,8 @@
 
 In this lesson, we dive into the fundamental differences between mutable and immutable infrastructure. Understanding these differences is essential when implementing Infrastructure as Code (IaC) and using tools like Terraform. Terraform handles resource updates by destroying an existing resource and then re-creating it with the updated settings, exemplifying immutable infrastructure by default.
 
+> 🧪 **Hands-on lab:** [Mutable vs Immutable Infrastructure](hands-on-lab/README.md) — deploy one EC2 instance, then watch a tag change go `~` (in-place) and an instance type change go `-/+` (destroy & recreate).
+
 ---
 
 ## **1️⃣ What is Mutable Infrastructure?**
