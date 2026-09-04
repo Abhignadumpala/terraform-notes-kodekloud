@@ -372,18 +372,19 @@ Not all changes force replacement! Terraform actually supports BOTH:
 ├─ Tags (Name, Environment, etc.)
 ├─ Descriptions
 ├─ Monitoring settings
-├─ Some configuration values
+├─ Instance Type (t2.micro → t2.small) — stop/modify/start, same ID!
 └─ Instance ID stays the SAME
 ```
 
 **❌ Immutable Attributes (Destroy & Recreate)** — Forces replacement:
 ```
-├─ Instance Type (t2.micro → t2.small)
 ├─ AMI (ami-123 → ami-456)
 ├─ VPC or Availability Zone
-├─ Root volume configuration
+├─ Subnet (moving to a different subnet)
 └─ Instance ID becomes DIFFERENT
 ```
+
+> ⚠️ **Counterintuitive one:** I originally assumed instance type change (`t2.micro` → `t2.small`) forced a replacement — it doesn't. `instance_type` isn't marked ForceNew on `aws_instance`; Terraform just stops the instance, calls the AWS API to resize it, and starts it back up. Same instance ID the whole way through. I confirmed this myself running the [hands-on lab](hands-on-lab/README.md) before fixing the example below. `ami` is the attribute that's actually ForceNew.
 
 ### **Example 1: Tag Change (Mutable - In-Place)**
 
@@ -446,28 +447,28 @@ Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
 
 ---
 
-### **Example 2: Instance Type Change (Immutable - Destroy & Recreate)**
+### **Example 2: AMI Change (Immutable - Destroy & Recreate)**
 
-**Initial Configuration (t2.micro):**
+**Initial Configuration (Amazon Linux 2):**
 
 ```hcl
 resource "aws_instance" "web" {
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.micro"  # Small instance
-  
+  ami           = "ami-0c55b159cbfafe1f0"  # Amazon Linux 2
+  instance_type = "t2.micro"
+
   tags = {
     Name = "web-server"
   }
 }
 ```
 
-**Update: Change instance type to t2.small**
+**Update: Switch to a different AMI (e.g. Ubuntu)**
 
 ```hcl
 resource "aws_instance" "web" {
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.small"  # Changed! (larger instance)
-  
+  ami           = "ami-0aabcde1234567890"  # Changed! (Ubuntu)
+  instance_type = "t2.micro"
+
   tags = {
     Name = "web-server"
   }
@@ -481,12 +482,12 @@ $ terraform plan
 
 # aws_instance.web must be replaced
 -/+ resource "aws_instance" "web" {
-      + ami                  = "ami-0c55b159cbfafe1f0"
-      ~ instance_type        = "t2.micro" -> "t2.small"  # forces replacement
-      - id                   = "i-0abc123def456abc" -> (known after apply)
-      + public_ip            = (known after apply)
-      + private_ip           = (known after apply)
-      + vpc_security_group_ids = (known after apply)
+      ~ ami                     = "ami-0c55b159cbfafe1f0" -> "ami-0aabcde1234567890"  # forces replacement
+        instance_type           = "t2.micro"
+      - id                      = "i-0abc123def456abc" -> (known after apply)
+      + public_ip               = (known after apply)
+      + private_ip              = (known after apply)
+      + vpc_security_group_ids  = (known after apply)
       tags = {
         Name = "web-server"
       }
@@ -500,22 +501,6 @@ Plan: 1 to add, 0 to change, 1 to destroy.
 ```bash
 $ terraform apply
 
-# aws_instance.web must be replaced
--/+ resource "aws_instance" "web" {
-      ~ instance_type = "t2.micro" -> "t2.small"  # forces replacement
-}
-
-Do you want to perform these actions?
-Terraform will perform the following actions:
-
-  # aws_instance.web must be replaced
-  -/+ resource "aws_instance" "web" {
-        ~ instance_type = "t2.micro" -> "t2.small"
-        # (other attributes)
-      }
-
-Plan: 1 to add, 0 to change, 1 to destroy.
-
 aws_instance.web: Destroying... [id=i-0abc123def456abc]
 aws_instance.web: Destruction complete after 15s
 
@@ -527,15 +512,17 @@ Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
 
 **What happened (Immutable):**
 ```
-Old instance: i-0abc123def456abc (t2.micro) ❌ DESTROYED
-New instance: i-0xyz789def123xyz (t2.small) ✅ CREATED
+Old instance: i-0abc123def456abc (Amazon Linux 2) ❌ DESTROYED
+New instance: i-0xyz789def123xyz (Ubuntu)          ✅ CREATED
 
 Notice:
 ├─ Instance ID changed completely
 ├─ Public IP changed (new instance)
 ├─ Private IP may change
-└─ All from scratch - immutable approach!
+└─ All from scratch - immutable approach! `ami` is ForceNew, `instance_type` isn't.
 ```
+
+I actually ran this one (AMI swap, not instance type) in the [hands-on lab](hands-on-lab/README.md) — same `-/+` and new instance ID both times, for real.
 
 ### **Another AWS Example: Security Group Rules**
 
@@ -590,55 +577,6 @@ Plan: 1 to add, 0 to change, 1 to destroy.
 ```
 
 **Key Point:** Even security groups are replaced when their rules change - true immutability!
-
-### **Real AWS Example: EC2 Immutable Update**
-
-```hcl
-# EC2 instance with specific AMI
-resource "aws_instance" "web" {
-  ami           = "ami-0c55b159cbfafe1f0"  # v1.17
-  instance_type = "t2.micro"
-  
-  tags = {
-    Name = "web-server"
-  }
-}
-```
-
-**Update AMI to new version:**
-
-```hcl
-resource "aws_instance" "web" {
-  ami           = "ami-1234567890abcdef0"  # v1.19 (new AMI)
-  instance_type = "t2.micro"
-  
-  tags = {
-    Name = "web-server"
-  }
-}
-```
-
-**Terraform destroys old instance, creates new:**
-
-```bash
-$ terraform apply
-
-# aws_instance.web must be replaced
--/+ resource "aws_instance" "web" {
-      + ami                  = "ami-1234567890abcdef0"  # NEW AMI
-      ~ instance_type        = "t2.micro"
-      - id                   = "i-0abc123def456" -> (known after apply)
-      - tags                 = { Name = "web-server" } -> (known after apply)
-}
-
-Plan: 1 to add, 0 to change, 1 to destroy.
-
-aws_instance.web: Destroying... [id=i-0abc123def456]
-aws_instance.web: Destruction complete after 5s
-aws_instance.web: Creating...
-aws_instance.web: Creation complete after 8s
-Apply complete! Resources: 1 added, 0 destroyed, 0 changed, 1 destroyed.
-```
 
 ---
 
