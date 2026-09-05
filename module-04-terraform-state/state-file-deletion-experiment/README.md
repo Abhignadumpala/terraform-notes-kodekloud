@@ -93,6 +93,97 @@ Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
 
 ![terraform apply after recreate - No changes, infrastructure matches configuration](images/07-terraform-apply-no-changes-after-recreate.png)
 
+## Follow-Up: Does `destroy` Get the Orphan Too, or Just the Tracked One?
+
+Natural next question — with two real instances running and only one of them in state, does `terraform destroy` clean up both, or only the one Terraform actually knows about?
+
+### 1. Destroy — only the tracked instance goes
+
+```bash
+terraform destroy
+```
+
+Plan targeted exactly one resource: `aws_instance.web_server`, `id = "i-0b27b7db8bc982f02"` — the newer instance, the one currently in state. No mention of the orphan anywhere in the plan.
+
+![terraform destroy plan - only i-0b27b7db8bc982f02 targeted](images/08-terraform-destroy-tracked-instance-plan.png)
+
+```
+aws_instance.web_server: Destroying... [id=i-0b27b7db8bc982f02]
+aws_instance.web_server: Destruction complete after 21s
+
+Destroy complete! Resources: 1 destroyed.
+```
+
+![terraform destroy complete - 1 destroyed](images/09-terraform-destroy-tracked-instance-complete.png)
+
+Confirmed in the console: exactly one instance still running, and it's the **orphan**, `i-0292984e9644234f4` — untouched, because `destroy` only ever acts on what's in state:
+
+![AWS console - only the orphaned instance i-0292984e9644234f4 still running](images/10-aws-console-orphaned-instance-still-running.png)
+
+This is the same fact as the original experiment, just from the other direction: state isn't just what creates resources, it's the *only* thing that gets to destroy them too. Anything Terraform doesn't know about is invisible to it either way.
+
+### 2. Import the orphan back into state
+
+With the tracked instance gone, `aws_instance.web_server` is a free address in state again — so the orphan can be imported straight into it:
+
+```bash
+terraform import aws_instance.web_server i-0292984e9644234f4
+```
+
+```
+aws_instance.web_server: Importing from ID "i-0292984e9644234f4"...
+aws_instance.web_server: Import prepared!
+  Prepared aws_instance for import
+aws_instance.web_server: Refreshing state... [id=i-0292984e9644234f4]
+
+Import successful!
+```
+
+Ran `terraform plan` right after, expecting some `~` reconciliation drift between the imported reality and the config (import only pulls in real attribute values, it doesn't check them against `ec2_instance.tf`). Got none:
+
+```
+No changes. Your infrastructure matches the configuration.
+```
+
+![terraform import successful, followed by plan showing no changes](images/11-terraform-import-and-plan-no-changes.png)
+
+Makes sense in hindsight — this particular orphan (`i-0292984e9644234f4`) was itself created by an earlier `apply` of this exact config (it's the instance from the [AMI-swap part of the mutable-vs-immutable lab](../../module-05-working-with-terraform/module-05.2-mutable-vs-immutable-infrastructure/hands-on-lab/README.md)), so its real attributes already matched `ec2_instance.tf` exactly. Importing a resource that was hand-created or edited outside Terraform would be the case where that diff actually shows up.
+
+### 3. Destroy again — now it takes the orphan too
+
+```bash
+terraform destroy
+```
+
+```
+# aws_instance.web_server will be destroyed
+- resource "aws_instance" "web_server" {
+    - id = "i-0292984e9644234f4" -> null
+    ...
+}
+
+Plan: 0 to add, 0 to change, 1 to destroy.
+```
+
+![terraform destroy plan targeting the imported orphan](images/12-terraform-destroy-imported-instance-plan.png)
+
+```
+aws_instance.web_server: Destroying... [id=i-0292984e9644234f4]
+aws_instance.web_server: Destruction complete after 31s
+
+Destroy complete! Resources: 1 destroyed.
+```
+
+![terraform destroy complete - imported instance destroyed](images/13-terraform-destroy-imported-instance-complete.png)
+
+Console confirms both instances are finally gone:
+
+![AWS console - no matching instances found](images/14-aws-console-no-instances-remaining.png)
+
+### What This Adds
+
+`import` isn't "make Terraform aware of this resource in addition to what it already manages" — it's "bind this specific real resource to this specific resource *address*." Since `aws_instance.web_server` can only ever point at one real instance at a time, recovering an orphan needs that address to be free first (here, freed by destroying the other instance that was occupying it). If both instances had needed to stay alive and managed simultaneously, the fix would've been adding a second `resource "aws_instance"` block and importing into *that* address instead.
+
 ## Takeaway
 
 Deleting state doesn't make Terraform "notice" anything is missing — it makes Terraform **forget the real infrastructure exists at all**. `plan`/`apply` fall back to their only other job: making reality match config, which here meant building a second copy from scratch. Drift detection depends entirely on state being present and accurate; with no state, there's nothing to detect drift *against*.
