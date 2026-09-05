@@ -384,6 +384,10 @@ terraform import aws_instance.web_server i-0a1b2c3d4e5f6g7h8
 
 Terraform starts managing a resource that already existed in AWS but wasn't in state before.
 
+### What Actually Happens If the State File Is Gone
+
+I tested this instead of just taking it on faith: deleted `terraform.tfstate` for a running instance and ran `terraform plan`. It did **not** show drift — with no state to compare against, Terraform just proposed a plain `+ create`, identical to a first-ever apply. Running `apply` after that built a second, real instance and left the original one running but orphaned (untracked, so `destroy` can't clean it up). Full write-up: [Experiment: What Happens If You Delete the State File?](../state-file-deletion-experiment/README.md)
+
 ---
 
 ## Best Practices
@@ -461,6 +465,7 @@ Getting these right is what keeps Terraform's biggest convenience — one file t
 
 - [Module 04.0: Introduction to Terraform State](../module-04.0-introduction-to-terraform-state/) — the hands-on lab
 - [Module 04.1: Purpose of State](../module-04.1-purpose-of-state/) — what the state file tracks and why
+- [Experiment: What Happens If You Delete the State File?](../state-file-deletion-experiment/README.md) — deleted state on a live instance to see whether Terraform shows drift or just recreates it (spoiler: recreates, and orphans the original)
 
 ## Official Resources
 
