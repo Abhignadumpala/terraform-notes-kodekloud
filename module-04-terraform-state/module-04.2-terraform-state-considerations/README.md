@@ -557,7 +557,7 @@ If I'm using AWS S3 as the remote backend, the security measures that matter mos
 - Use state locking (DynamoDB) to prevent conflicting writes
 - Restrict IAM access to just the state bucket
 
-> 🧪 **Hands-on lab:** [S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — stand up the S3 bucket and DynamoDB lock table, migrate a real EC2 instance's state onto them, then simulate a held lock and watch `terraform plan` refuse to run until it's resolved.
+> 🧪 **Hands-on lab:** [S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — stood up the S3 bucket and DynamoDB lock table, migrated a real EC2 instance's state onto them, confirmed the state object actually lives in S3 (not locally), simulated a held lock and watched `terraform plan` refuse to run until it was resolved with `force-unlock`, then destroyed everything in the right order.
 
 ---
 
@@ -583,7 +583,7 @@ Getting these right is what keeps Terraform's biggest convenience — one file t
 - [Module 04.0: Introduction to Terraform State](../module-04.0-introduction-to-terraform-state/) — the hands-on lab
 - [Module 04.1: Purpose of State](../module-04.1-purpose-of-state/) — what the state file tracks and why
 - [Experiment: What Happens If You Delete the State File?](../state-file-deletion-experiment/README.md) — deleted state on a live instance to see whether Terraform shows drift or just recreates it (spoiler: recreates, and orphans the original), then tested whether `destroy` reaches the orphan too and used `import` to bring it back under management
-- [Hands-On Lab: S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — remote state and locking, in practice rather than in theory
+- [Hands-On Lab: S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — remote state and locking, in practice rather than in theory: bootstrap the backend, migrate state, trigger and resolve a real lock conflict, then tear it all down cleanly
 
 ## Official Resources
 
