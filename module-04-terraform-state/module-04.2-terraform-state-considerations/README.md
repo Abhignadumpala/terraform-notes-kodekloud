@@ -8,10 +8,123 @@ Terraform state is the single source of truth for Terraform — it's how Terrafo
 
 ## Table of Contents
 
-1. [Sensitive Information in the State File](#sensitive-information-in-the-state-file)
-2. [Terraform Configuration Files vs. State File](#terraform-configuration-files-vs-state-file)
-3. [Editing the State File](#editing-the-state-file)
-4. [Best Practices](#best-practices)
+1. [Local State vs. Remote State](#local-state-vs-remote-state)
+2. [State Locking In Detail](#state-locking-in-detail)
+3. [Sensitive Information in the State File](#sensitive-information-in-the-state-file)
+4. [Terraform Configuration Files vs. State File](#terraform-configuration-files-vs-state-file)
+5. [Editing the State File](#editing-the-state-file)
+6. [Best Practices](#best-practices)
+
+---
+
+## Local State vs. Remote State
+
+### What Is Local State?
+
+By default, Terraform keeps state the simplest way it possibly can: a `terraform.tfstate` file sitting right next to my `.tf` files, on whatever machine I happened to run `apply` from.
+
+```
+BEFORE (Local):
+
+My Laptop
+└─ terraform.tfstate   (only I can see this)
+```
+
+That's fine for a solo experiment, and it's exactly what every lab in this repo has used up to this point. It stops being fine the moment more than one person or one machine needs to touch the same infrastructure.
+
+**Problems with local state, concretely:**
+
+- **Not shared.** A teammate running `terraform plan` on their own laptop has no idea my state exists. Terraform looks like it wants to recreate everything I already built, because as far as *their* copy of Terraform is concerned, nothing exists yet.
+- **No locking.** Two people (or two CI jobs) running `apply` against the same infrastructure at the same time can each read the same "before" state, make conflicting changes, and the second one to finish silently overwrites the first one's state file. Nothing stops this locally — there's no lock to acquire.
+- **A single point of failure.** If my laptop dies, gets wiped, or the file gets deleted, the state goes with it. Terraform still has no memory of what it built — same failure mode as the [state-file-deletion experiment](../state-file-deletion-experiment/README.md), just triggered by hardware instead of `rm`.
+- **Sensitive data on one uncontrolled disk.** Whatever's in the state (see [Sensitive Information in the State File](#sensitive-information-in-the-state-file) below) is only as safe as that one laptop's disk encryption — no access logging, no IAM policy, nothing.
+
+### What Is Remote State?
+
+Remote state just means the same `terraform.tfstate` file lives somewhere shared and durable instead — an S3 bucket, Terraform Cloud, Azure Blob Storage, a GCS bucket — instead of a folder on one disk. Every `terraform` command reads and writes through that backend instead of the local file.
+
+```
+AFTER (Remote):
+
+Cloud (AWS S3)
+└─ terraform.tfstate   (my whole team, and CI, can all reach this)
+```
+
+**What moving to S3 specifically buys me** (this is the [`backend "s3"` hands-on lab](hands-on-lab/README.md) I actually ran):
+
+- **Shared access** — anyone with the right IAM permissions gets the same, current state. No more "works on my machine" because my machine is the only one with the state file.
+- **Versioning** — with S3 bucket versioning on, every write to `terraform.tfstate` keeps its prior version, so a bad apply's state is recoverable, not just overwritten forever.
+- **Encryption at rest** — SSE on the bucket instead of whatever (if anything) my laptop's disk encryption is doing.
+- **No local artifact to lose** — confirmed this directly in the lab: after pointing `app/` at the S3 backend, `ls` in that directory shows no `terraform.tfstate` at all. It's not there to lose.
+- **The precondition for locking** — a shared backend is what makes state locking possible in the first place. Local state has nowhere to hold a lock; a shared backend does.
+
+Remote state on its own solves *access* and *durability*. It doesn't, by itself, stop two people writing at once — that's what locking is for.
+
+---
+
+## State Locking In Detail
+
+### What a Lock Actually Protects Against
+
+Picture two people running `terraform apply` against the exact same remote state, seconds apart, with no locking in place:
+
+1. Both read the *same* current state as their starting point.
+2. Both compute a plan based on that same starting point.
+3. Person A finishes first and writes their new state.
+4. Person B finishes second and writes *their* new state — silently overwriting whatever Person A just did, because Person B's plan was never aware Person A's change happened.
+
+Nothing in that sequence raises an error. The state file just quietly loses Person A's change, and Terraform's internal record of "what's really deployed" is now wrong. That's the failure state locking exists to prevent.
+
+### How It Works With S3 + DynamoDB
+
+Before Terraform writes state, it first tries to acquire a lock by writing a lock item to a DynamoDB table, keyed on `LockID` — which is just `<bucket>/<key>` for that specific state file. That write is a **conditional put**: it only succeeds if no lock item already exists for that `LockID`.
+
+- **No existing lock** → the put succeeds, Terraform proceeds with `plan`/`apply`, and deletes the lock item when it's done.
+- **A lock already exists** → the conditional put fails, and Terraform refuses to continue at all — it doesn't queue, wait, or retry. It just stops and tells me who (supposedly) holds the lock, what operation they're running, and when it started.
+
+I confirmed this exact mechanic myself in the [S3 + DynamoDB locking lab](hands-on-lab/README.md) by writing a fake lock item straight into the table and then running `terraform plan`:
+
+```
+Error: Error acquiring the state lock
+
+Lock Info:
+  ID:        fake-lock-id
+  Operation: OperationTypeApply
+  Who:       someone-else@another-machine
+
+Terraform acquires a state lock to protect the state from being written
+by multiple users at the same time. Please resolve the issue above and
+try again.
+```
+
+Terraform didn't try to be clever about merging or waiting — it just stopped, exactly as it would have if a real teammate's `apply` were genuinely still running.
+
+### Resolving a Stuck Lock
+
+A lock normally clears itself the moment the operation holding it finishes. It only stays stuck if that operation crashed, got killed, or (like my lab) was never real to begin with. Two ways to clear it:
+
+```bash
+# Tell Terraform to release it (records who force-unlocked, for the record)
+terraform force-unlock <LOCK_ID>
+
+# Or remove the DynamoDB item directly - what force-unlock does under the hood
+aws dynamodb delete-item \
+  --table-name terraform-state-locks \
+  --key '{"LockID": {"S": "<bucket>/<key>"}}'
+```
+
+`force-unlock` should only ever be used once I'm actually certain no other operation is genuinely still running against that state — using it to bypass a *real* lock defeats the entire point of having one.
+
+### A Note on Newer Terraform Versions
+
+Running through the lab, `terraform init` printed a deprecation warning I hadn't expected:
+
+```
+Warning: Deprecated Parameter
+  The parameter "dynamodb_table" is deprecated. Use parameter "use_lockfile" instead.
+```
+
+Recent Terraform versions can do S3 native locking via a lockfile object in the same bucket (`use_lockfile = true`), without a separate DynamoDB table at all. `dynamodb_table` still works — it's the classic mechanism, and what this lab deliberately used to see the lock-and-DynamoDB relationship directly — but it's worth knowing the newer option exists for anything built going forward.
 
 ---
 
@@ -452,6 +565,8 @@ If I'm using AWS S3 as the remote backend, the security measures that matter mos
 
 Managing Terraform state comes down to a few security-minded habits:
 
+- **Local state doesn't scale past one person** — no sharing, no locking, no recovery if the laptop is gone
+- **Remote state (e.g. S3) fixes access and durability** — locking (e.g. DynamoDB) is the separate piece that fixes concurrent writes
 - **State holds sensitive data** — plaintext passwords, IP addresses, API keys, and credentials, not just resource ids
 - **Never commit state to Git** — always use a remote backend (S3, Terraform Cloud) instead
 - **Keep config and state separate** — HCL goes in Git; state goes in secured remote storage
