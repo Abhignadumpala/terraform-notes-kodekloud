@@ -187,35 +187,88 @@ Checked the table directly afterward — the fake lock item is really there, sit
 
 ![AWS console - DynamoDB scan showing the fake lock item and the digest item](images/22-aws-console-dynamodb-lock-items.png)
 
-### 6. Resolve the lock (not yet run)
+### 6. Resolve the lock
 
-Two ways, both legitimate depending on the situation:
+Went with `force-unlock` (Option A), since I knew this specific lock was the fake one I'd just planted, not a real in-progress operation:
 
 ```bash
-# Option A: you know it's genuinely stale/fake and safe to clear
 terraform force-unlock fake-lock-id
+```
 
-# Option B: go straight at the DynamoDB item (what force-unlock does under the hood)
+```
+Do you really want to force-unlock?
+  Terraform will remove the lock on the remote state.
+  This will allow local Terraform commands to modify this state, even though it
+  may still be in use. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+Terraform state has been successfully unlocked!
+```
+
+`terraform plan` right after confirmed things were back to normal:
+
+```
+Acquiring state lock. This may take a few moments...
+No changes. Your infrastructure matches the configuration.
+```
+
+![force-unlock succeeds, then terraform plan runs clean](images/23-force-unlock-and-plan-clean.png)
+
+The other option — going straight at the DynamoDB item — would have been:
+
+```bash
 aws dynamodb delete-item \
   --table-name terraform-state-locks \
   --key '{"LockID": {"S": "tf-state-mutable-immutable-lab-47393c8b/state-locking-lab/terraform.tfstate"}}'
 ```
 
-`terraform plan` should go back to normal immediately after.
+(`force-unlock` is really just a wrapper around that same delete, with a confirmation prompt.)
 
-### 7. Clean up (not yet run)
+### 7. Clean up
 
 ```bash
-# Remove the EC2 instance first
 cd app
 terraform destroy
+```
 
-# Then tear down the bucket + lock table
+```
+# aws_instance.state_lab will be destroyed
+Plan: 0 to add, 0 to change, 1 to destroy.
+
+aws_instance.state_lab: Destroying... [id=i-0bdaa3485bf7b291a]
+aws_instance.state_lab: Destruction complete after 31s
+
+Destroy complete! Resources: 1 destroyed.
+```
+
+![app terraform destroy plan - instance state_lab to be destroyed](images/24-app-terraform-destroy-plan.png)
+![app terraform destroy complete - 1 destroyed](images/25-app-terraform-destroy-complete.png)
+
+Then the backend resources themselves:
+
+```bash
 cd ../bootstrap
 terraform destroy
 ```
 
-Order matters here — `bootstrap`'s bucket has `force_destroy = true` specifically so this works even with a state object still inside it, but destroying `app/`'s resource first is still the cleaner sequence (its state literally lives in that bucket).
+```
+Plan: 0 to add, 0 to change, 6 to destroy.
+
+aws_s3_bucket_public_access_block.terraform_state: Destruction complete after 1s
+aws_s3_bucket_server_side_encryption_configuration.terraform_state: Destruction complete after 1s
+aws_s3_bucket_versioning.terraform_state: Destruction complete after 1s
+aws_s3_bucket.terraform_state: Destruction complete after 1s
+random_id.suffix: Destruction complete after 0s
+aws_dynamodb_table.terraform_locks: Destruction complete after 8s
+
+Destroy complete! Resources: 6 destroyed.
+```
+
+![bootstrap terraform destroy plan - dynamodb table and s3 bucket resources](images/26-bootstrap-terraform-destroy-plan.png)
+![bootstrap terraform destroy complete - 6 destroyed](images/27-bootstrap-terraform-destroy-complete.png)
+
+`aws_s3_bucket.terraform_state` destroyed cleanly on the first try, with the state object (`state-locking-lab/terraform.tfstate`) still inside it — that only works because `force_destroy = true` was set on the bucket. A real state bucket should not have that; the trade-off is a normal `terraform destroy` on it would fail with "BucketNotEmpty" until the bucket was emptied by hand, which is exactly the point — it stops a state bucket from being torn down by accident.
 
 ---
 
@@ -231,4 +284,4 @@ Order matters here — `bootstrap`'s bucket has `force_destroy = true` specifica
 
 Matches [Module 04.2](../README.md#securing-state-in-s3)'s "Securing State in S3" checklist point for point — this lab is what each of those bullets actually looks like happening.
 
-**Still outstanding:** the fake lock item is still sitting in `terraform-state-locks`, and the EC2 instance (`i-0bdaa3485bf7b291a`) plus the S3 bucket and DynamoDB table are all still up. Steps 6 and 7 above still need to be run to actually clear the lock and tear everything down.
+Everything's torn down now — the instance, the fake lock, the S3 bucket, and the DynamoDB table are all gone. Full lifecycle covered: create the backend, migrate state onto it, prove state locking actually blocks a conflicting write, resolve the lock, then clean up in the right order.
