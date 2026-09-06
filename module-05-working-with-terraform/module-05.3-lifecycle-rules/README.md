@@ -52,17 +52,7 @@ Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
 
 **Problem:** During this 30-60 second process, your website goes DOWN. Users see 502 Bad Gateway. Revenue is lost.
 
-**Solution:** Use lifecycle rules to control this behavior and create the new instance BEFORE destroying the old one (zero downtime!).
-
----
-
-## Lifecycle Rules
-
-Terraform offers several lifecycle rules to modify this default behavior. These rules can be configured within the resource block:
-
-- **create_before_destroy:** Create the new resource before destroying the old one
-- **prevent_destroy:** Prevent resource deletion
-- **ignore_changes:** Ignore specific attribute changes
+**Solution:** Use lifecycle rules to control this behavior and create the new instance BEFORE destroying the old one (zero downtime!). Terraform offers three of these, all configured within a resource's `lifecycle` block:
 
 ---
 
