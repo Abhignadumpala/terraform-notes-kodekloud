@@ -466,20 +466,6 @@ Remote storage (AWS S3):
   terraform.tfstate.backup    — encrypted and access-controlled
 ```
 
-### Why This Separation?
-
-**Configuration files (HCL):**
-- Same across all developers
-- Describes intent, not current reality
-- No secrets hardcoded
-- Belongs in version control
-
-**State file (JSON):**
-- Different per environment
-- Contains actual AWS resource ids
-- Contains sensitive data
-- Belongs in centralized, secured storage — not Git
-
 ---
 
 ## Editing the State File
