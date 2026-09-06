@@ -1,0 +1,7 @@
+{
+  "ID": "test-lock-123",
+  "Operation": "OperationTypeApply",
+  "Who": "someone-else@another-machine",
+  "Version": "1.5.0",
+  "Created": "2024-09-06T17:20:00Z"
+}

@@ -22,8 +22,6 @@
 - **`bootstrap/`** — creates the S3 bucket. Stays on local state, since it's creating the very backend other configs will point at.
 - **`app/`** — one free-tier EC2 instance, using the bucket from `bootstrap/` as its `backend "s3"`, with `use_lockfile = true` for locking (no DynamoDB table).
 
-*Redoing this lab against native S3 locking (it was originally built on DynamoDB) — screenshots to follow once it's rerun.*
-
 ---
 
 ## Walking Through It
@@ -36,12 +34,14 @@ terraform init
 terraform apply
 ```
 
-```
-Apply complete! Resources: 5 added, 0 changed, 0 destroyed.
+Apply complete — bucket created, nothing else:
 
-Outputs:
-state_bucket_name = "tf-state-mutable-immutable-lab-47393c8b"
-```
+![Apply complete, bucket name output](images/01-bootstrap-apply-complete-bucket-output.png)
+
+Confirmed in the console — bucket exists and is empty, since nothing's used it as a backend yet:
+
+![AWS console - bucket created](images/02-aws-console-bucket-created.png)
+![AWS console - bucket has no objects yet](images/03-aws-console-bucket-empty.png)
 
 ### 2. Point `app/` at that bucket
 
@@ -49,7 +49,7 @@ Typed the real bucket name into `app/provider.tf`'s backend block by hand — Te
 
 ```hcl
 backend "s3" {
-  bucket       = "tf-state-mutable-immutable-lab-47393c8b"
+  bucket       = "tf-state-mutable-immutable-lab-5c2c73f8"
   key          = "state-locking-lab/terraform.tfstate"
   region       = "us-east-1"
   use_lockfile = true
@@ -57,17 +57,18 @@ backend "s3" {
 }
 ```
 
+![app/provider.tf before and after editing in the terminal](images/04-app-provider-tf-before-after-edit.png)
+
 ### 3. Initialize `app/` against the S3 backend
+
+`app/` already had some local state left over from an earlier test apply, so this needed `-migrate-state` to carry it into the new backend instead of starting fresh:
 
 ```bash
 cd ../app
-terraform init
+terraform init -migrate-state
 ```
 
-```
-Successfully configured the backend "s3"! Terraform will automatically
-use this backend unless the backend configuration changes.
-```
+![terraform init -migrate-state - backend configured successfully](images/05-app-terraform-init-migrate-state.png)
 
 ### 4. Apply and confirm state actually moved
 
@@ -76,47 +77,75 @@ terraform plan
 terraform apply
 ```
 
-```
-Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
-```
+![Apply complete - instance created, outputs shown](images/06-app-apply-complete-outputs.png)
+![AWS console - EC2 instance running](images/07-aws-console-ec2-instance-running.png)
 
-`ls` in `app/` shows only `.tf` files — no local `terraform.tfstate` anymore. In S3, the state file itself showed up at `state-locking-lab/terraform.tfstate`, and a lock file briefly appeared right next to it while the apply was running.
+Proof state didn't land locally — `ls` in `app/` shows only the `.tf` files, no `terraform.tfstate` anywhere:
+
+![ls in app/ - no local tfstate file](images/08-app-no-local-tfstate.png)
+
+And in S3, exactly where the backend block's `key` said it would be:
+
+![AWS console - state object details in S3](images/09-aws-console-state-object-details.png)
 
 ### 5. Simulate a held lock
 
-```bash
-aws s3api put-object \
-  --bucket tf-state-mutable-immutable-lab-47393c8b \
-  --key state-locking-lab/terraform.tfstate.tflock \
-  --body fake-lock.json
+The plan was to fake a held lock by writing my own lock file straight into the bucket. First problem: the lock object isn't named `<state key>.tflock` like I'd assumed going in — it's a fixed filename, `.terraform.lock.terraform`, sitting next to the state file in the same folder.
 
-terraform plan
+```bash
+cat > fake-lock.json << 'EOF'
+{
+  "ID": "test-lock-123",
+  "Operation": "OperationTypeApply",
+  "Who": "someone-else@another-machine",
+  "Version": "1.5.0",
+  "Created": "2024-09-06T17:20:00Z"
+}
+EOF
 ```
+
+![Creating fake-lock.json](images/10-fake-lock-json-created.png)
+
+After uploading that as `state-locking-lab/.terraform.lock.terraform`, `terraform plan` refused outright:
 
 ```
 Error: Error acquiring the state lock
 
+Error message: operation error S3: PutObject, https response error StatusCode: 412, ...
+api error PreconditionFailed: At least one of the pre-conditions you specified did not hold
 Lock Info:
-  ID:        fake-lock-id
+  ID:        6b05becb-9114-a314-4e0e-a0dffc5807ad
+  Path:      tf-state-mutable-immutable-lab-5c2c73f8/state-locking-lab/terraform.tfstate
   Operation: OperationTypeApply
-  Who:       someone-else@another-machine
-
-Terraform acquires a state lock to protect the state from being written
-by multiple users at the same time. Please resolve the issue above and
-try again.
+  Who:       sri-abhi@sri-abhi-ThinkCentre-M900
+  Version:   1.15.8
+  Created:   2026-09-06 16:35:45.433458945 +0000 UTC
 ```
+
+![terraform plan fails with Error acquiring the state lock](images/11-terraform-plan-lock-error.png)
+
+Worth noting: that Lock Info doesn't actually match the fake JSON I uploaded (different ID, my own machine instead of "someone-else"). I confirmed via the console that the object sitting in the bucket really was my `fake-lock.json` content — so unlike DynamoDB locking's error (which echoes the real blocking record), the S3 native-locking error here didn't reliably reflect the actual content of the file blocking it.
+
+![AWS console - lock file content matches the fake JSON I uploaded](images/12-aws-console-lock-file-content.png)
 
 ### 6. Resolve the lock
 
+I tried `force-unlock` using the ID from the error:
+
 ```bash
-terraform force-unlock fake-lock-id
+terraform force-unlock 6b05becb-9114-a314-4e0e-a0dffc5807ad
 ```
 
+It failed — but for an unexpected reason:
+
 ```
-Terraform state has been successfully unlocked!
+Failed to unlock state: unable to retrieve file from S3 bucket 'tf-state-mutable-immutable-lab-5c2c73f8'
+with key 'state-locking-lab/terraform.tfstate.tflock': ... NoSuchKey: The specified key does not exist.
 ```
 
-`terraform plan` right after came back clean — no changes.
+`force-unlock` went looking for the old `<key>.tflock` naming — not `.terraform.lock.terraform`, which is what the bucket actually had. A real mismatch between how this Terraform version's `force-unlock` looks up a native S3 lock and where that lock actually lives. Despite that failure, the next `terraform apply` went through cleanly on its own, and a follow-up `plan` came back clean too:
+
+![force-unlock fails with NoSuchKey, then a clean apply/plan](images/13-force-unlock-then-clean-plan.png)
 
 ### 7. Clean up
 
@@ -125,11 +154,8 @@ cd app && terraform destroy
 cd ../bootstrap && terraform destroy
 ```
 
-```
-Destroy complete! Resources: 1 destroyed.
-...
-Destroy complete! Resources: 5 destroyed.
-```
+![app terraform destroy complete](images/14-app-terraform-destroy-complete.png)
+![bootstrap terraform destroy complete](images/15-bootstrap-terraform-destroy-complete.png)
 
 ---
 
@@ -144,3 +170,5 @@ Destroy complete! Resources: 5 destroyed.
 | Lost-laptop risk | State gone with it | State untouched |
 
 Full breakdown of *why* each row matters: [Module 04.2](../README.md#securing-state-in-s3).
+
+The lock step didn't go exactly as scripted — I went in planning to fake a clean lock conflict and instead ran into a real naming mismatch (`.terraform.lock.terraform` vs. the `.tflock` suffix I'd assumed) and a `force-unlock` command that failed for the wrong reason. Leaving that in rather than smoothing it over, since it's a more honest picture of what native S3 locking actually looks like in practice than the tidy version would have been.

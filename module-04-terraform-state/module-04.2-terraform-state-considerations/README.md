@@ -112,7 +112,7 @@ For an AWS-based setup, S3 is the natural place to put state:
 **5. Set the right IAM permissions.** Whoever (or whatever CI job) runs Terraform needs, at minimum:
 - `s3:ListBucket` on the bucket
 - `s3:GetObject` and `s3:PutObject` on the state file
-- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lock file (the state file's key with `.tflock` on the end)
+- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lock file (a fixed name, `.terraform.lock.terraform`, sitting next to the state file — confirmed in [the hands-on lab](hands-on-lab/README.md))
 
 **6. Point the backend block at the bucket:**
 

@@ -10,7 +10,7 @@ terraform {
   # this bucket name has to be typed in by hand, copied from bootstrap's
   # `state_bucket_name` output.
   backend "s3" {
-    bucket       = "tf-state-mutable-immutable-lab-47393c8b" # from bootstrap's state_bucket_name output
+    bucket       = "tf-state-mutable-immutable-lab-5c2c73f8" # from bootstrap's state_bucket_name output
     key          = "state-locking-lab/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true # native S3 locking - no DynamoDB table needed
