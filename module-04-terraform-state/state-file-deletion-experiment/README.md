@@ -1,6 +1,6 @@
 # Experiment: What Happens If You Delete the State File?
 
-> Related to [Module 04.2: Terraform State Considerations](../module-04.2-terraform-state-considerations/README.md#editing-the-state-file) — that note says state should be backed up because it's "genuinely hard to reconstruct if it's lost." I wanted to actually see what "hard to reconstruct" looks like, so I deleted it on purpose.
+> Related to [Module 04.2: Terraform State Considerations](../module-04.2-terraform-state-considerations/README.md) — that note covers why state needs to live somewhere with versioning, since it's genuinely hard to reconstruct by hand if it's lost. I wanted to actually see what "hard to reconstruct" looks like, so I deleted it on purpose.
 
 Ran this against the EC2 instance from the [Module 5.2 mutable-vs-immutable lab](../../module-05-working-with-terraform/module-05.2-mutable-vs-immutable-infrastructure/hands-on-lab/README.md), which was still up and running.
 
@@ -188,4 +188,4 @@ Console confirms both instances are finally gone:
 
 Deleting state doesn't make Terraform "notice" anything is missing — it makes Terraform **forget the real infrastructure exists at all**. `plan`/`apply` fall back to their only other job: making reality match config, which here meant building a second copy from scratch. Drift detection depends entirely on state being present and accurate; with no state, there's nothing to detect drift *against*.
 
-This is the concrete version of [Module 04.2](../module-04.2-terraform-state-considerations/README.md)'s "back up state files regularly" advice — the failure mode isn't a scary error message, it's a silently duplicated, silently orphaned, silently billable resource.
+This is the concrete version of [Module 04.2](../module-04.2-terraform-state-considerations/README.md)'s point about state needing versioning and backups — the failure mode isn't a scary error message, it's a silently duplicated, silently orphaned, silently billable resource.
