@@ -2,6 +2,19 @@
 
 > Companion hands-on lab for [Module 04.2: Terraform State Considerations](../README.md#securing-state-in-s3) — see that note for the full explanation of how remote state and S3 native locking actually work. Code lives in [`bootstrap/`](bootstrap) and [`app/`](app).
 
+## Table of Contents
+
+1. [What I Built](#what-i-built)
+2. [Walking Through It](#walking-through-it)
+   1. [Create the backend resources](#1-create-the-backend-resources)
+   2. [Point `app/` at that bucket](#2-point-app-at-that-bucket)
+   3. [Initialize `app/` against the S3 backend](#3-initialize-app-against-the-s3-backend)
+   4. [Apply and confirm state actually moved](#4-apply-and-confirm-state-actually-moved)
+   5. [Simulate a held lock](#5-simulate-a-held-lock)
+   6. [Resolve the lock](#6-resolve-the-lock)
+   7. [Clean up](#7-clean-up)
+3. [What This Confirms](#what-this-confirms)
+
 ---
 
 ## What I Built

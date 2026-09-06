@@ -4,6 +4,19 @@ I recently worked through Terraform state management and remote backends. When I
 
 Most material I'd read up to this point (including the course this repo follows) teaches DynamoDB for state locking. But Terraform moves fast, and as of version 1.10+, it supports state locking natively through S3 — no DynamoDB table required. This note covers how state works, why a remote backend matters, and how to set one up using S3's native locking.
 
+## Table of Contents
+
+1. [Understanding Terraform State](#understanding-terraform-state)
+2. [The Challenge: Working in a Team](#the-challenge-working-in-a-team)
+   - [Why Not Just Put State in Git?](#why-not-just-put-state-in-git)
+3. [Remote Backends: The Fix](#remote-backends-the-fix)
+4. [Why Amazon S3](#why-amazon-s3)
+5. [Setting Up S3 as a Remote Backend](#setting-up-s3-as-a-remote-backend)
+   - [Securing State in S3](#securing-state-in-s3)
+6. [What Terraform Does Automatically After This](#what-terraform-does-automatically-after-this)
+7. [Migrating from DynamoDB to Native S3 Locking](#migrating-from-dynamodb-to-native-s3-locking)
+8. [Conclusion](#conclusion)
+
 ---
 
 ## Understanding Terraform State
