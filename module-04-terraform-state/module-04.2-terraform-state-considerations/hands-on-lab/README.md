@@ -41,6 +41,7 @@ Apply complete — bucket created, nothing else:
 Confirmed in the console — bucket exists and is empty, since nothing's used it as a backend yet:
 
 ![AWS console - bucket created](images/02-aws-console-bucket-created.png)
+
 ![AWS console - bucket has no objects yet](images/03-aws-console-bucket-empty.png)
 
 ### 2. Point `app/` at that bucket
@@ -78,6 +79,7 @@ terraform apply
 ```
 
 ![Apply complete - instance created, outputs shown](images/06-app-apply-complete-outputs.png)
+
 ![AWS console - EC2 instance running](images/07-aws-console-ec2-instance-running.png)
 
 Proof state didn't land locally — `ls` in `app/` shows only the `.tf` files, no `terraform.tfstate` anywhere:
@@ -155,6 +157,7 @@ cd ../bootstrap && terraform destroy
 ```
 
 ![app terraform destroy complete](images/14-app-terraform-destroy-complete.png)
+
 ![bootstrap terraform destroy complete](images/15-bootstrap-terraform-destroy-complete.png)
 
 ---
