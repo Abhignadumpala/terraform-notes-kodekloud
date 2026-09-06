@@ -57,8 +57,23 @@ Cloud (AWS S3)
 - **Encryption at rest** — SSE on the bucket instead of whatever (if anything) my laptop's disk encryption is doing.
 - **No local artifact to lose** — confirmed this directly in the lab: after pointing `app/` at the S3 backend, `ls` in that directory shows no `terraform.tfstate` at all. It's not there to lose.
 - **The precondition for locking** — a shared backend is what makes state locking possible in the first place. Local state has nowhere to hold a lock; a shared backend does.
+- **Built for this specifically** — S3 is designed for 99.999999999% durability and 99.99% availability, and lab-scale Terraform usage like this comfortably fits inside the AWS Free Tier.
 
 Remote state on its own solves *access* and *durability*. It doesn't, by itself, stop two people writing at once — that's what locking is for.
+
+### Why Not Just Put State in Git?
+
+Since the `.tf` files already live in Git, my first instinct was to commit `terraform.tfstate` there too. That doesn't hold up:
+
+- **Manual, and easy to get wrong.** Nothing forces a `git pull` before `apply` or a `git push` after — skip either one and someone runs Terraform against a stale state, which can roll back real changes or duplicate resources.
+- **No locking.** Git has no concept of "this file is currently being written to by someone else's `terraform apply`" — the exact race condition [state locking](#state-locking-in-detail) exists to prevent.
+- **Sensitive data ends up versioned forever.** Deleting the file later doesn't remove it from Git history — see [Sensitive Information in the State File](#sensitive-information-in-the-state-file) for what that actually exposes.
+
+### Keeping Environments Isolated
+
+One thing remote state doesn't fix automatically: a single state file covering every environment. If dev, staging, and prod all point at the same `terraform.tfstate`, a `plan` meant for staging can see — and touch — production resources by mistake, since Terraform only knows about whatever's in that one file.
+
+The fix is to give each environment its own state on purpose — a distinct `key` in the same S3 bucket (`dev/terraform.tfstate`, `prod/terraform.tfstate`) or a separate [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) per environment. Done that way, a mistake in one environment's plan literally can't reach another environment's resources, because it's reading a completely different file. A shared backend makes this *possible*; it still has to be set up deliberately, the same way [`app/`'s backend block](hands-on-lab/app/provider.tf) hardcodes one specific `key` for one specific environment.
 
 ---
 
@@ -75,14 +90,14 @@ Picture two people running `terraform apply` against the exact same remote state
 
 Nothing in that sequence raises an error. The state file just quietly loses Person A's change, and Terraform's internal record of "what's really deployed" is now wrong. That's the failure state locking exists to prevent.
 
-### How It Works With S3 + DynamoDB
+### How It Works With S3 Native Locking
 
-Before Terraform writes state, it first tries to acquire a lock by writing a lock item to a DynamoDB table, keyed on `LockID` — which is just `<bucket>/<key>` for that specific state file. That write is a **conditional put**: it only succeeds if no lock item already exists for that `LockID`.
+Before Terraform writes state, Terraform 1.10+ tries to acquire a lock by writing a **lockfile object** into the same S3 bucket — the state object's key with a `.tflock` suffix. That write is a **conditional `PutObject`**: it only succeeds if no lockfile object already exists at that key.
 
-- **No existing lock** → the put succeeds, Terraform proceeds with `plan`/`apply`, and deletes the lock item when it's done.
+- **No existing lock** → the put succeeds, Terraform proceeds with `plan`/`apply`, and deletes the lockfile object when it's done.
 - **A lock already exists** → the conditional put fails, and Terraform refuses to continue at all — it doesn't queue, wait, or retry. It just stops and tells me who (supposedly) holds the lock, what operation they're running, and when it started.
 
-I confirmed this exact mechanic myself in the [S3 + DynamoDB locking lab](hands-on-lab/README.md) by writing a fake lock item straight into the table and then running `terraform plan`:
+I confirmed this exact mechanic myself in the [S3 native locking lab](hands-on-lab/README.md) by creating a fake lockfile object straight in the bucket and then running `terraform plan`:
 
 ```
 Error: Error acquiring the state lock
@@ -97,7 +112,28 @@ by multiple users at the same time. Please resolve the issue above and
 try again.
 ```
 
-Terraform didn't try to be clever about merging or waiting — it just stopped, exactly as it would have if a real teammate's `apply` were genuinely still running.
+Terraform didn't try to be clever about merging or waiting — it just stopped, exactly as it would have if a real teammate's `apply` were genuinely still running. If I'd rather Terraform wait out a short-lived lock instead of failing immediately, `-lock-timeout=10m` on `plan`/`apply` does that.
+
+### Legacy Mechanism: DynamoDB
+
+Before `use_lockfile` existed, an S3 backend needed a separate DynamoDB table for locking — same conditional-write idea, just a conditional `PutItem` against a table row (keyed on `LockID`) instead of an S3 object. `dynamodb_table` still works as a backend parameter, but `terraform init` now flags it:
+
+```
+Warning: Deprecated Parameter
+  The parameter "dynamodb_table" is deprecated. Use parameter "use_lockfile" instead.
+```
+
+I originally built [the hands-on lab](hands-on-lab/README.md) against DynamoDB, since that's what most material (this course included) still teaches, then redid it with native locking once I hit that warning myself — one fewer AWS resource to create, pay for, and tear down.
+
+### Migrating from DynamoDB to Native S3 Locking
+
+For an existing setup still on `dynamodb_table`:
+
+1. Upgrade to Terraform 1.10 or later.
+2. Add `use_lockfile = true` to the backend block — it can sit alongside `dynamodb_table` while migrating, as a safety net.
+3. Run `terraform init` to reconfigure the backend.
+4. Confirm locking still works with a real (or simulated) `apply`.
+5. Remove `dynamodb_table` once confident, then delete the DynamoDB table itself so it stops costing anything.
 
 ### Resolving a Stuck Lock
 
@@ -107,24 +143,16 @@ A lock normally clears itself the moment the operation holding it finishes. It o
 # Tell Terraform to release it (records who force-unlocked, for the record)
 terraform force-unlock <LOCK_ID>
 
-# Or remove the DynamoDB item directly - what force-unlock does under the hood
+# Or remove the lockfile object directly - what force-unlock does under the hood
+aws s3 rm s3://<bucket>/<key>.tflock
+
+# On an older, DynamoDB-locked setup, the equivalent is removing the table item:
 aws dynamodb delete-item \
   --table-name terraform-state-locks \
   --key '{"LockID": {"S": "<bucket>/<key>"}}'
 ```
 
 `force-unlock` should only ever be used once I'm actually certain no other operation is genuinely still running against that state — using it to bypass a *real* lock defeats the entire point of having one.
-
-### A Note on Newer Terraform Versions
-
-Running through the lab, `terraform init` printed a deprecation warning I hadn't expected:
-
-```
-Warning: Deprecated Parameter
-  The parameter "dynamodb_table" is deprecated. Use parameter "use_lockfile" instead.
-```
-
-Recent Terraform versions can do S3 native locking via a lockfile object in the same bucket (`use_lockfile = true`), without a separate DynamoDB table at all. `dynamodb_table` still works — it's the classic mechanism, and what this lab deliberately used to see the lock-and-DynamoDB relationship directly — but it's worth knowing the newer option exists for anything built going forward.
 
 ---
 
@@ -554,10 +582,15 @@ If I'm using AWS S3 as the remote backend, the security measures that matter mos
 - Enable encryption at rest
 - Enable versioning for recovery
 - Block all public access on the bucket
-- Use state locking (DynamoDB) to prevent conflicting writes
+- Use state locking — native S3 (`use_lockfile`) on Terraform 1.10+, DynamoDB on older versions
 - Restrict IAM access to just the state bucket
 
-> 🧪 **Hands-on lab:** [S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — stood up the S3 bucket and DynamoDB lock table, migrated a real EC2 instance's state onto them, confirmed the state object actually lives in S3 (not locally), simulated a held lock and watched `terraform plan` refuse to run until it was resolved with `force-unlock`, then destroyed everything in the right order.
+**Minimum IAM permissions for the backend to actually work:**
+- `s3:ListBucket` on the bucket
+- `s3:GetObject` and `s3:PutObject` on the state object
+- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lockfile object (same key, `.tflock` suffix)
+
+> 🧪 **Hands-on lab:** [S3 Backend + Native State Locking](hands-on-lab/README.md) — stood up the S3 bucket, migrated a real EC2 instance's state onto it, confirmed the state object actually lives in S3 (not locally), simulated a held lock with S3's native lockfile and watched `terraform plan` refuse to run until it was resolved with `force-unlock`, then destroyed everything in the right order.
 
 ---
 
@@ -566,7 +599,7 @@ If I'm using AWS S3 as the remote backend, the security measures that matter mos
 Managing Terraform state comes down to a few security-minded habits:
 
 - **Local state doesn't scale past one person** — no sharing, no locking, no recovery if the laptop is gone
-- **Remote state (e.g. S3) fixes access and durability** — locking (e.g. DynamoDB) is the separate piece that fixes concurrent writes
+- **Remote state (e.g. S3) fixes access and durability** — locking (native S3 lockfile, or DynamoDB on older setups) is the separate piece that fixes concurrent writes
 - **State holds sensitive data** — plaintext passwords, IP addresses, API keys, and credentials, not just resource ids
 - **Never commit state to Git** — always use a remote backend (S3, Terraform Cloud) instead
 - **Keep config and state separate** — HCL goes in Git; state goes in secured remote storage
@@ -583,7 +616,7 @@ Getting these right is what keeps Terraform's biggest convenience — one file t
 - [Module 04.0: Introduction to Terraform State](../module-04.0-introduction-to-terraform-state/) — the hands-on lab
 - [Module 04.1: Purpose of State](../module-04.1-purpose-of-state/) — what the state file tracks and why
 - [Experiment: What Happens If You Delete the State File?](../state-file-deletion-experiment/README.md) — deleted state on a live instance to see whether Terraform shows drift or just recreates it (spoiler: recreates, and orphans the original), then tested whether `destroy` reaches the orphan too and used `import` to bring it back under management
-- [Hands-On Lab: S3 Backend + DynamoDB State Locking](hands-on-lab/README.md) — remote state and locking, in practice rather than in theory: bootstrap the backend, migrate state, trigger and resolve a real lock conflict, then tear it all down cleanly
+- [Hands-On Lab: S3 Backend + Native State Locking](hands-on-lab/README.md) — remote state and locking, in practice rather than in theory: bootstrap the backend, migrate state, trigger and resolve a real lock conflict, then tear it all down cleanly
 
 ## Official Resources
 

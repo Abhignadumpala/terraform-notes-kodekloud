@@ -1,6 +1,6 @@
 # This config deliberately has no backend block - it stays on local state.
-# It's creating the S3 bucket + DynamoDB table that OTHER configs will use as
-# their backend, so it can't use them as its own backend (chicken-and-egg).
+# It's creating the S3 bucket that OTHER configs will use as their backend,
+# so it can't use that bucket as its own backend (chicken-and-egg).
 
 resource "random_id" "suffix" {
   byte_length = 4
@@ -42,13 +42,6 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
-resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "terraform-state-locks"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-}
+# No DynamoDB table here - state locking for app/ comes from S3's own
+# lockfile support (`use_lockfile = true` in app/'s backend block), not a
+# separate lock table.
