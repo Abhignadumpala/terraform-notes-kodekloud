@@ -97,7 +97,7 @@ resource "aws_db_instance" "prod" {
 
 **What happens:** If you try to delete it, Terraform throws an error. Resource is safe! ✅
 
-⚠️ **Note:** This only blocks config changes. `terraform destroy` will still delete it.
+⚠️ **Note:** This blocks `terraform destroy` too, not just config changes that would replace the resource. To actually remove a `prevent_destroy` resource, remove the `lifecycle` block (or set it to `false`) first, run `apply` so Terraform picks that up, then `destroy`.
 
 ---
 
