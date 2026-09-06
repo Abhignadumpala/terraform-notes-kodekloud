@@ -32,7 +32,7 @@ state_bucket_name = "tf-state-mutable-immutable-lab-47393c8b"
 
 ### 2. Point `app/` at that bucket
 
-Filled in the real bucket name in `app/provider.tf`'s backend block (has to be a literal — backend blocks can't reference outputs from another config):
+Typed the real bucket name into `app/provider.tf`'s backend block by hand — Terraform reads this block before anything else runs, so it can't pull the value from a variable or another config's output. It has to be plain text:
 
 ```hcl
 backend "s3" {
@@ -67,7 +67,7 @@ terraform apply
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
 
-`ls` in `app/` shows only `.tf` files — no local `terraform.tfstate`. In S3, the state object sits at `state-locking-lab/terraform.tfstate`, with a lockfile object appearing alongside it during the apply.
+`ls` in `app/` shows only `.tf` files — no local `terraform.tfstate` anymore. In S3, the state file itself showed up at `state-locking-lab/terraform.tfstate`, and a lock file briefly appeared right next to it while the apply was running.
 
 ### 5. Simulate a held lock
 
@@ -124,9 +124,9 @@ Destroy complete! Resources: 5 destroyed.
 
 | | Local state (default) | S3 + native locking (this lab) |
 |---|---|---|
-| Where state lives | `terraform.tfstate` on disk | S3 object, confirmed |
+| Where state lives | `terraform.tfstate` on disk | The same file, but in S3 (confirmed) |
 | Visible to teammates/CI | No | Yes |
-| Concurrent `apply` protection | None | S3 lockfile blocked `plan` outright |
+| Concurrent `apply` protection | None | The S3 lock file blocked `plan` outright |
 | Extra AWS resources for locking | N/A | None |
 | Lost-laptop risk | State gone with it | State untouched |
 
