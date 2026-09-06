@@ -54,10 +54,10 @@ Cloud (AWS S3)
 
 - **Shared access** — anyone with the right IAM permissions gets the same, current state. No more "works on my machine" because my machine is the only one with the state file.
 - **Versioning** — with S3 bucket versioning on, every write to `terraform.tfstate` keeps its prior version, so a bad apply's state is recoverable, not just overwritten forever.
-- **Encryption at rest** — SSE on the bucket instead of whatever (if anything) my laptop's disk encryption is doing.
+- **Encryption at rest** — S3 encrypts the file automatically, instead of relying on whatever (if anything) my laptop's disk encryption happens to be doing.
 - **No local artifact to lose** — confirmed this directly in the lab: after pointing `app/` at the S3 backend, `ls` in that directory shows no `terraform.tfstate` at all. It's not there to lose.
-- **The precondition for locking** — a shared backend is what makes state locking possible in the first place. Local state has nowhere to hold a lock; a shared backend does.
-- **Built for this specifically** — S3 is designed for 99.999999999% durability and 99.99% availability, and lab-scale Terraform usage like this comfortably fits inside the AWS Free Tier.
+- **Makes locking possible at all** — local state has nowhere to hold a "someone else is using this" lock. A shared backend does, which is the whole reason [state locking](#state-locking-in-detail) can exist in the first place.
+- **Built for exactly this job** — Amazon designs S3 to basically never lose a file and almost never be unreachable (they quote "eleven nines" of durability), and a lab-sized amount of usage like this fits comfortably inside the AWS Free Tier, i.e. free.
 
 Remote state on its own solves *access* and *durability*. It doesn't, by itself, stop two people writing at once — that's what locking is for.
 
@@ -81,23 +81,27 @@ The fix is to give each environment its own state on purpose — a distinct `key
 
 ### What a Lock Actually Protects Against
 
-Picture two people running `terraform apply` against the exact same remote state, seconds apart, with no locking in place:
+Picture two people running `terraform apply` against the same infrastructure, just seconds apart, with nothing stopping them:
 
-1. Both read the *same* current state as their starting point.
-2. Both compute a plan based on that same starting point.
-3. Person A finishes first and writes their new state.
-4. Person B finishes second and writes *their* new state — silently overwriting whatever Person A just did, because Person B's plan was never aware Person A's change happened.
+1. Both look at the same starting state before doing anything.
+2. Both work out their own plan from that same starting point.
+3. Person A finishes first and saves their new state.
+4. Person B finishes just after — and saves *their* new state right on top of it. Person B's plan never knew about Person A's change, so it just gets overwritten.
 
-Nothing in that sequence raises an error. The state file just quietly loses Person A's change, and Terraform's internal record of "what's really deployed" is now wrong. That's the failure state locking exists to prevent.
+No error, no warning. Person A's change quietly disappears, and Terraform now has the wrong idea of what's actually deployed. A lock exists purely to stop this — by making sure only one `apply` at a time is ever allowed to touch a given state file.
 
-### How It Works With S3 Native Locking
+### How Locking Actually Works
 
-Before Terraform writes state, Terraform 1.10+ tries to acquire a lock by writing a **lockfile object** into the same S3 bucket — the state object's key with a `.tflock` suffix. That write is a **conditional `PutObject`**: it only succeeds if no lockfile object already exists at that key.
+Think of it like a single-occupancy bathroom door: whoever gets there first locks it, and everyone else waits outside until it's free again. Terraform does the same thing before it writes state — it tries to "lock the door," and only goes ahead if nobody else already has it locked.
 
-- **No existing lock** → the put succeeds, Terraform proceeds with `plan`/`apply`, and deletes the lockfile object when it's done.
-- **A lock already exists** → the conditional put fails, and Terraform refuses to continue at all — it doesn't queue, wait, or retry. It just stops and tells me who (supposedly) holds the lock, what operation they're running, and when it started.
+**With native S3 locking** (Terraform 1.10+), the "lock" is just a small file Terraform creates in the same S3 bucket as my state file — named after the state file, with `.tflock` added on the end.
 
-I confirmed this exact mechanic myself in the [S3 native locking lab](hands-on-lab/README.md) by creating a fake lockfile object straight in the bucket and then running `terraform plan`:
+- If that file doesn't exist yet, Terraform creates it, does its work, then deletes it when it's done.
+- If the file already exists, Terraform can't create a new one — so it stops immediately and tells me who's supposedly holding the lock and what they're doing, instead of waiting around or trying again.
+
+(Under the hood, S3 only allows that file to be created if it doesn't already exist — that's the actual mechanism enforcing "one lock at a time." Good to know, not something I need to think about day to day.)
+
+I confirmed this in the [S3 native locking lab](hands-on-lab/README.md) by creating a fake lock file by hand and then running `terraform plan`:
 
 ```
 Error: Error acquiring the state lock
@@ -112,47 +116,47 @@ by multiple users at the same time. Please resolve the issue above and
 try again.
 ```
 
-Terraform didn't try to be clever about merging or waiting — it just stopped, exactly as it would have if a real teammate's `apply` were genuinely still running. If I'd rather Terraform wait out a short-lived lock instead of failing immediately, `-lock-timeout=10m` on `plan`/`apply` does that.
+Terraform didn't try to be clever about merging things or waiting — it just stopped, exactly as it would if a teammate's `apply` were genuinely still running. If I'd rather Terraform wait for a lock to clear instead of failing right away, adding `-lock-timeout=10m` to `plan`/`apply` tells it to wait up to 10 minutes before giving up.
 
-### Legacy Mechanism: DynamoDB
+### The Older Way: DynamoDB
 
-Before `use_lockfile` existed, an S3 backend needed a separate DynamoDB table for locking — same conditional-write idea, just a conditional `PutItem` against a table row (keyed on `LockID`) instead of an S3 object. `dynamodb_table` still works as a backend parameter, but `terraform init` now flags it:
+Before this lock-file trick existed, an S3 backend needed a separate DynamoDB table just to hold locks — same "first one there wins" idea, just using a row in a database table instead of a file. That setting (`dynamodb_table`) still works, but Terraform now nudges me toward the newer option:
 
 ```
 Warning: Deprecated Parameter
   The parameter "dynamodb_table" is deprecated. Use parameter "use_lockfile" instead.
 ```
 
-I originally built [the hands-on lab](hands-on-lab/README.md) against DynamoDB, since that's what most material (this course included) still teaches, then redid it with native locking once I hit that warning myself — one fewer AWS resource to create, pay for, and tear down.
+I originally built [the hands-on lab](hands-on-lab/README.md) with DynamoDB, since that's what most material (this course included) still teaches, then redid it with native locking once I ran into that warning myself — one less thing to set up, pay for, and tear down.
 
-### Migrating from DynamoDB to Native S3 Locking
+### Switching From DynamoDB to Native Locking
 
-For an existing setup still on `dynamodb_table`:
+For an existing setup that's still using `dynamodb_table`:
 
-1. Upgrade to Terraform 1.10 or later.
-2. Add `use_lockfile = true` to the backend block — it can sit alongside `dynamodb_table` while migrating, as a safety net.
-3. Run `terraform init` to reconfigure the backend.
-4. Confirm locking still works with a real (or simulated) `apply`.
-5. Remove `dynamodb_table` once confident, then delete the DynamoDB table itself so it stops costing anything.
+1. Make sure Terraform is on version 1.10 or later.
+2. Add `use_lockfile = true` next to the existing `dynamodb_table` line — both can be active at once while switching over, as a safety net.
+3. Run `terraform init` again so the backend picks up the change.
+4. Try a real (or harmless test) `apply` to confirm locking still works.
+5. Once confident, remove `dynamodb_table` and delete the DynamoDB table itself, since nothing needs it anymore.
 
-### Resolving a Stuck Lock
+### Clearing a Lock That's Stuck
 
-A lock normally clears itself the moment the operation holding it finishes. It only stays stuck if that operation crashed, got killed, or (like my lab) was never real to begin with. Two ways to clear it:
+A lock normally goes away on its own the moment the operation holding it finishes. It only stays stuck if that operation crashed, got killed, or — like in my lab — was never a real operation to begin with. Two ways to clear it:
 
 ```bash
-# Tell Terraform to release it (records who force-unlocked, for the record)
+# Tell Terraform to release it (records that I force-unlocked, for the record)
 terraform force-unlock <LOCK_ID>
 
-# Or remove the lockfile object directly - what force-unlock does under the hood
+# Or delete the lock file directly - this is what force-unlock does under the hood
 aws s3 rm s3://<bucket>/<key>.tflock
 
-# On an older, DynamoDB-locked setup, the equivalent is removing the table item:
+# On an older setup using DynamoDB, the equivalent is deleting the table row instead:
 aws dynamodb delete-item \
   --table-name terraform-state-locks \
   --key '{"LockID": {"S": "<bucket>/<key>"}}'
 ```
 
-`force-unlock` should only ever be used once I'm actually certain no other operation is genuinely still running against that state — using it to bypass a *real* lock defeats the entire point of having one.
+`force-unlock` should only ever be used once I'm genuinely sure no other operation is still running against that state — using it to bypass a *real* lock defeats the entire point of having one.
 
 ---
 
@@ -585,10 +589,11 @@ If I'm using AWS S3 as the remote backend, the security measures that matter mos
 - Use state locking — native S3 (`use_lockfile`) on Terraform 1.10+, DynamoDB on older versions
 - Restrict IAM access to just the state bucket
 
-**Minimum IAM permissions for the backend to actually work:**
+Whoever (or whatever CI job) runs Terraform needs an IAM policy that actually allows talking to the bucket — without it, `init`/`plan`/`apply` will fail with an access-denied error before locking even comes into play. At minimum:
+
 - `s3:ListBucket` on the bucket
-- `s3:GetObject` and `s3:PutObject` on the state object
-- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lockfile object (same key, `.tflock` suffix)
+- `s3:GetObject` and `s3:PutObject` on the state file
+- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lock file (same name, with `.tflock` on the end)
 
 > 🧪 **Hands-on lab:** [S3 Backend + Native State Locking](hands-on-lab/README.md) — stood up the S3 bucket, migrated a real EC2 instance's state onto it, confirmed the state object actually lives in S3 (not locally), simulated a held lock with S3's native lockfile and watched `terraform plan` refuse to run until it was resolved with `force-unlock`, then destroyed everything in the right order.
 
