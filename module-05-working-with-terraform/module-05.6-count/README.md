@@ -8,7 +8,16 @@
 
 ## Introduction
 
-The `count` meta-argument (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) creates multiple identical copies of a resource from a single block — no copy-pasting the same resource over and over. This module goes deeper: static vs. dynamic count, and a pitfall that catches a lot of people off guard — removing an item from the list `count` is based on doesn't do what you'd expect.
+This article explores Terraform's `count` meta-argument for creating multiple resource instances and discusses issues with modifying the underlying list used with `count`.
+
+In this guide, we explore how the `count` meta-argument can be used to create multiple resource instances and discuss potential issues when modifying the underlying list used with `count`. This guide covers both static and dynamic count techniques to help you manage resources efficiently.
+
+`count` (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) lets you create **N identical copies** of a resource from a single `resource` block — no copy-pasting the same block over and over just to change a name or a number. We'll cover both ways of setting `N`:
+
+- **Static count** — a hardcoded number, `count = 3`.
+- **Dynamic count** — driven by a list's size, `count = length(var.some_list)`, so the number of resources tracks the number of items in that list.
+
+Dynamic count is where things get interesting: it looks like it "just works" when you add or remove items from the list, but removing or reordering an item earlier in the list doesn't do what you'd expect — it shifts every resource after it and replaces them, when you only meant to touch one. That's the pitfall this module (and the lab) walks through in detail, before you hit it for real in your own code.
 
 ---
 
@@ -136,6 +145,8 @@ resource "aws_instance" "servers" {
 ```
 
 `aws_instance.servers[0]` → `web`, `[1]` → `app`, `[2]` → `db`.
+
+**What's `length()` doing here?** `length()` is a built-in Terraform function that counts the elements in a list (or the characters in a string, or the keys in a map). `length(var.instance_names)` on `["web", "app", "db"]` returns `3` — a plain number, which is exactly what `count` needs. So `count = length(var.instance_names)` reads as: *however many names are in this list, create that many instances.* Add a 4th name to the list and `length()` returns `4` on the next `plan` — `count` follows without you touching the resource block at all.
 
 **Benefit:** change the list, and `count` follows automatically. ✅ ...but see the pitfall below — "change" doesn't mean "add and remove safely."
 
