@@ -259,17 +259,12 @@ Destroy complete! Resources: 3 destroyed.
 
 ## What This Confirms
 
-| Rule | Test | Without the rule | With the rule |
-|---|---|---|---|
-| `create_before_destroy` | Swap the AMI (forces replacement) | `-/+` destroy and then create — old instance gone before the new one exists | `+/-` create replacement and then destroy — new instance (`i-0e833f3ec038c41a9`) up 15s before the old one (`i-04f451ea77a3e83dc`) is destroyed |
-| `ignore_changes` | Change the `Name` tag from the AWS CLI | Plan reverts the tag back to `lifecycle-rules-lab` on the next `apply` | `No changes.` — Terraform leaves the externally-set tag alone |
-| `prevent_destroy` | `terraform destroy` | *(no comparison — this rule has no useful "without" state; that's just the default)* | Whole destroy plan blocked with `Error: Instance cannot be destroyed`, even though only the bucket has the rule |
+| Rule | Test | Without the rule | With the rule | Real-world use |
+|---|---|---|---|---|
+| `create_before_destroy` | Swap the AMI (forces replacement) | `-/+` destroy and then create — old instance gone before the new one exists | `+/-` create replacement and then destroy — new instance (`i-0e833f3ec038c41a9`) up 15s before the old one (`i-04f451ea77a3e83dc`) is destroyed | **Zero-downtime deploys.** Anything serving live traffic (web servers, load-balanced instances) — the new instance is up and ready *before* the old one disappears, so there's no gap where nothing is serving requests. Without it, there's a window (here, ~21s) where the resource just doesn't exist. |
+| `ignore_changes` | Change the `Name` tag from the AWS CLI | Plan reverts the tag back to `lifecycle-rules-lab` on the next `apply` | `No changes.` — Terraform leaves the externally-set tag alone | **Coexisting with systems outside Terraform.** Auto-tagging Lambdas, an ASG that manages its own instance count, a config-management tool touching the same resource — anything where a second system legitimately owns an attribute and you don't want Terraform constantly "fixing" it back. |
+| `prevent_destroy` | `terraform destroy` | *(no comparison — this rule has no useful "without" state; that's just the default)* | Whole destroy plan blocked with `Error: Instance cannot be destroyed`, even though only the bucket has the rule | **A safety net for anything irreplaceable.** Production databases, state buckets, anything holding data you can't regenerate. It blocked the *entire* destroy plan, not just the bucket — so one protected resource is enough to stop an accidental `terraform destroy` from wiping out everything else too. |
 
 **What surprised me:** I assumed cleaning up a `prevent_destroy` resource needed a `terraform apply` first to update the state before `terraform destroy` would cooperate. It doesn't — `prevent_destroy` is a config-time check, not a state-time one, so removing the `lifecycle` block and going straight to `terraform destroy` worked in one step.
-
-**Real-world takeaways:**
-- `create_before_destroy` is what you'd actually want on anything serving live traffic — the AMI-swap test is a stand-in for a real deploy.
-- `ignore_changes` is for resources some other system also touches — auto-tagging, ASG-managed attributes, etc. — where you want Terraform to stop fighting them.
-- `prevent_destroy` is a real safety net: it blocked the *entire* `terraform destroy`, not just the protected resource, which is exactly the behavior you'd want on something like a production database.
 
 Matches [Module 5.3](../README.md)'s framing of all three rules — this just makes it concrete with actual instance IDs and AWS console screenshots instead of theory.
