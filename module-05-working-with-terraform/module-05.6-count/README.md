@@ -226,22 +226,49 @@ See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced again
 ## When to Use Count
 
 ✅ **Use `count` for:**
-- N identical resources with no meaningful per-instance identity beyond a number
-- Simple, static scaling (`count = 3` → `count = 10`)
-- Lists you only ever append to
+- Creating N identical resources (all same configuration)
+- Simple scaling scenarios
+- Static or predictable lists
 
-❌ **Avoid `count` for:**
-- Lists you add to and remove from in the middle
-- Resources you reference by a stable name, not a position
-- Anything where an accidental replacement would be costly
+❌ **Don't use `count` for:**
+- Adding/removing items from lists (causes replacements)
+- Named resources you reference often
+- Complex configurations where you need readable names
 
-**Better fit for those cases:** `for_each` — Module 5.7.
+**Better alternative:** Use `for_each` (Module 5.7) when list order matters or when you add/remove items
 
 ---
 
 ## Summary
 
-- `count = N` creates `N` copies of a resource; `count = length(var.list)` ties that number to a list's size.
-- `count.index` addresses each copy — `aws_instance.web[0]`, `[1]`, `[2]`, etc. — and `[*]` pulls an attribute across every copy at once.
-- The pitfall: `count` indices are positions, not identities. Removing or reordering an earlier list element shifts every later position, which Terraform reads as "these resources changed" — triggering replacements you didn't ask for.
-- When list membership changes over time (not just its length), reach for `for_each` instead.
+In this guide, we demonstrated how to use the `count` meta-argument in Terraform to create multiple resource instances.
+
+We examined:
+- ✅ **Static count:** `count = 3` to create a fixed number of identical resources
+- ✅ **Dynamic count:** `count = length(var.list)` to create based on list size
+- ✅ **Accessing resources:** Using `count.index`, `[*]`, and individual indices
+- ✅ **Common pitfall:** Removing elements from count lists causes index shifting and unnecessary resource replacements
+
+The most important lesson: **When using count with lists, be extremely careful about removing or reordering elements**, as this triggers unnecessary resource replacements due to index shifting.
+
+---
+
+## Key Takeaway
+
+**`count` = Simple way to create N identical resources**
+
+- ✅ Use `count = 3` for static count
+- ✅ Use `count = length(var.list)` for dynamic count
+- ✅ Use `count.index` to access current iteration
+- ✅ Use `[*]` to access all instances
+- ❌ Avoid removing items from count lists (causes replacements)
+
+---
+
+## Practice & Next Steps
+
+Practice using the `count` meta-argument in your Terraform projects to automate resource creation and better manage infrastructure changes.
+
+**Important:** Always remember that count indices are fragile when list order changes.
+
+**Better alternative:** Use `for_each` (Module 5.7) when you need to add/remove items without replacing everything.
