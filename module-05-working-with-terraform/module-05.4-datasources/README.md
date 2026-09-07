@@ -178,6 +178,8 @@ resource "aws_security_group" "web" {
 
 **Why:** Don't hardcode a VPC ID — look it up by tag instead, so the same config works across accounts and regions.
 
+**What's that `filter` block doing?** `name` here isn't a Terraform argument — it's the name of an AWS API filter, and `tag:Name` means "filter on the tag key `Name`". `values` is what that tag has to match. So this whole block reads as: *find the VPC whose `Name` tag equals `"main-vpc"`*. Swap `tag:Name` for any other tag key (`tag:Environment`, `tag:Team`, etc.), or use a different filter name entirely — `cidr-block`, `is-default`, `state` — depending on what you're searching by. Every AWS datasource that takes `filter` blocks works the same way: `name` = the AWS-defined filter, `values` = what to match.
+
 ---
 
 ### 3. Fetch Available Availability Zones
@@ -196,6 +198,10 @@ resource "aws_instance" "app" {
 
 **Why:** Automatically works in whatever region you deploy to, without hardcoding AZ names.
 
+**What's `state = "available"` for?** Not every AZ AWS returns is usable in your account — some require opting in first, others might be impaired. `state = "available"` filters the list down to AZs you can actually launch resources into right now. Skip it and you risk `names[0]` picking an AZ you can't actually use, and the apply failing.
+
+**Why `.names[0]`?** `data.aws_availability_zones.available.names` is a list (e.g. `["us-east-1a", "us-east-1b", "us-east-1c"]`) — `[0]` just grabs the first one. Fine for a single-AZ example like this; for anything spanning multiple AZs (subnets, ASGs) you'd loop over the whole list instead of hardcoding an index.
+
 ---
 
 ## When to Use Datasources
@@ -213,6 +219,8 @@ resource "aws_instance" "app" {
 ---
 
 ## Resource vs Datasource
+
+![Resource vs Data Source: resource uses keyword "resource" and creates/updates/destroys infrastructure (also called Managed Resources); data source uses keyword "data" and only reads infrastructure (also called Data Resources) — shown against terraform.tfstate with a solid icon for the managed resource and a dashed icon for the data source](images/01-datasources-course-slide.jpg)
 
 | Type | Purpose | Managed by Terraform |
 |---|---|---|
