@@ -207,17 +207,11 @@ Terraform has 7 meta-arguments in total. This module only went deep on the first
 
 ## Summary
 
-Meta-arguments aren't resource-specific — they work the same way on any `resource` block:
-
-- **`depends_on`** — forces explicit ordering when Terraform can't see the dependency itself.
-- **`lifecycle`** — controls how a resource is created, updated, and destroyed ([Module 5.3](../module-05.3-lifecycle-rules/README.md)).
-- **`count`** — creates multiple copies of a resource from one block.
-
-Without meta-arguments, Terraform still does the right thing most of the time — it infers order from references and creates one of everything. Meta-arguments are for the cases where you need to say more than that. 🎯
+Meta-arguments aren't resource-specific — they work the same way on any `resource` block. Without them, Terraform still does the right thing most of the time — it infers order from references and creates one of everything. They're for the cases where you need to say more than that. 🎯
 
 ---
 
 ## Next Steps
 
-- Module 5.6: `count` and `for_each` in depth — creating multiple resources
+- [Module 5.6: Count](../module-05.6-count/README.md) — static vs. dynamic count, and the index-shifting pitfall when a `count`-driven list changes
 - Module 5.7: `for_each` — advanced looping with maps

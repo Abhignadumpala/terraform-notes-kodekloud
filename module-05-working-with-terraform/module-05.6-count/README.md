@@ -1,0 +1,239 @@
+# 📘 Module 5.6: Count
+
+> Creating multiple identical resources from one block, and why removing an item from the list you're counting over is more dangerous than it looks
+
+> 🧪 **Hands-on lab:** [Count](hands-on-lab/README.md) — deploy 3 EC2 instances from one `count` block, then remove one name from the list and watch the index-shifting pitfall happen for real.
+
+---
+
+## Introduction
+
+The `count` meta-argument (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) creates multiple identical copies of a resource from a single block — no copy-pasting the same resource over and over. This module goes deeper: static vs. dynamic count, and a pitfall that catches a lot of people off guard — removing an item from the list `count` is based on doesn't do what you'd expect.
+
+---
+
+## What is the Count Meta-Argument?
+
+**How it works:**
+- Add `count = N` to a resource block
+- Terraform creates `N` copies of that resource
+- Each copy gets a numeric index: `[0]`, `[1]`, `[2]`, ... `[N-1]`
+- `count.index` inside the block gives the current copy's index
+
+```hcl
+resource "aws_instance" "app" {
+  count         = 3 # creates 3 EC2 instances
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "instance-${count.index}" # instance-0, instance-1, instance-2
+  }
+}
+```
+
+**What Terraform creates:**
+- `aws_instance.app[0]` → `instance-0`
+- `aws_instance.app[1]` → `instance-1`
+- `aws_instance.app[2]` → `instance-2`
+
+**Key points:**
+- ✅ No code repetition
+- ✅ Trivial to scale — change `count = 3` to `count = 10`
+- ✅ Every copy gets a unique index automatically
+- ✅ Works on any resource type, not just `aws_instance`
+
+---
+
+## Understanding the Problem
+
+### The Problem: Repetitive Code
+
+Without `count`, three near-identical instances means three near-identical resource blocks:
+
+```hcl
+resource "aws_instance" "app" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+  tags = { Name = "app-1" }
+}
+
+resource "aws_instance" "app2" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+  tags = { Name = "app-2" }
+}
+
+resource "aws_instance" "app3" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+  tags = { Name = "app-3" }
+}
+```
+
+**Problems:**
+- ❌ Repetitive
+- ❌ Hard to maintain — a config change means editing N blocks
+- ❌ Doesn't scale to 10, 20, 100 instances
+
+### The Solution: Use Count
+
+```hcl
+resource "aws_instance" "app" {
+  count         = 3
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "app-${count.index}" # app-0, app-1, app-2
+  }
+}
+```
+
+**Benefits:**
+- ✅ One block instead of three
+- ✅ Scale by changing a single number
+- ✅ Names generated automatically from the index
+
+---
+
+## Static vs. Dynamic Count
+
+### Static Count
+
+Just a hardcoded number:
+
+```hcl
+resource "aws_instance" "app" {
+  count         = 3 # exactly 3, always
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "instance-${count.index}"
+  }
+}
+```
+
+### Dynamic Count with `length()`
+
+Base the count on the size of a list instead:
+
+```hcl
+variable "instance_names" {
+  default = ["web", "app", "db"]
+}
+
+resource "aws_instance" "servers" {
+  count         = length(var.instance_names) # 3, from the list
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = var.instance_names[count.index]
+  }
+}
+```
+
+`aws_instance.servers[0]` → `web`, `[1]` → `app`, `[2]` → `db`.
+
+**Benefit:** change the list, and `count` follows automatically. ✅ ...but see the pitfall below — "change" doesn't mean "add and remove safely."
+
+---
+
+## Accessing Count Resources
+
+```hcl
+# All IDs, as a list
+output "instance_ids" {
+  value = aws_instance.web[*].id
+}
+# ["i-0123456789", "i-9876543210", "i-1111111111"]
+
+# One specific instance
+output "first_instance" {
+  value = aws_instance.web[0].id
+}
+# "i-0123456789"
+
+# The whole resource, all copies
+output "all_instances" {
+  value = aws_instance.web
+}
+```
+
+---
+
+## ⚠️ The Pitfall: Index Shifting
+
+`count.index` is just a position in a list — `web[0]`, `web[1]`, `web[2]`. Terraform ties each resource instance to that *position*, not to the value that happened to be there when it was created. Remove an item from the front or middle of the list, and everything after it shifts down by one position — but Terraform doesn't see "one item removed," it sees "the values at these positions changed."
+
+```hcl
+resource "aws_instance" "web" {
+  count         = length(var.web_server_names)
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = var.web_server_names[count.index]
+  }
+}
+```
+
+**Before** (`web_server_names = ["web-1", "web-2", "web-3"]`): `web[0]=web-1`, `web[1]=web-2`, `web[2]=web-3`.
+
+**After removing `"web-1"`** (`web_server_names = ["web-2", "web-3"]`): the list only has 2 elements now, but position 0 holds `"web-2"` and position 1 holds `"web-3"`.
+
+```
+# aws_instance.web[0] must be replaced
+-/+ resource "aws_instance" "web" {
+    ~ tags = {
+        ~ "Name" = "web-1" -> "web-2"   # position 0's value changed — replace it
+      }
+  }
+
+# aws_instance.web[1] must be replaced
+-/+ resource "aws_instance" "web" {
+    ~ tags = {
+        ~ "Name" = "web-2" -> "web-3"   # position 1's value changed — replace it
+      }
+  }
+
+# aws_instance.web[2] will be destroyed
+- resource "aws_instance" "web" {
+    ~ tags = {
+        ~ "Name" = "web-3" -> null      # position 2 no longer exists — destroy it
+      }
+  }
+```
+
+**Why:** `web[0]` is tied to position 0, and position 0's value changed from `"web-1"` to `"web-2"` — that's a `Name` tag change, so Terraform wants to replace it. Same story for `web[1]`. And `web[2]` — position 2 doesn't exist in the new list at all, so it's destroyed. Removing *one* name from the front of the list ends up touching *every* resource after it: two unwanted replacements plus one real deletion, instead of the one deletion you actually wanted. On instances that's downtime and churn; on anything with `prevent_destroy` or real state (a database, an attached volume), it's a lot worse.
+
+**The fix:** `for_each` (covered next, in Module 5.7) keys each resource by a stable *value* instead of a position, so removing one item only touches that one item. Until then, the rule with `count` over a list is: only ever append to the end, or accept that removing/reordering earlier elements will replace everything after them.
+
+See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced against real AWS instances.
+
+---
+
+## When to Use Count
+
+✅ **Use `count` for:**
+- N identical resources with no meaningful per-instance identity beyond a number
+- Simple, static scaling (`count = 3` → `count = 10`)
+- Lists you only ever append to
+
+❌ **Avoid `count` for:**
+- Lists you add to and remove from in the middle
+- Resources you reference by a stable name, not a position
+- Anything where an accidental replacement would be costly
+
+**Better fit for those cases:** `for_each` — Module 5.7.
+
+---
+
+## Summary
+
+- `count = N` creates `N` copies of a resource; `count = length(var.list)` ties that number to a list's size.
+- `count.index` addresses each copy — `aws_instance.web[0]`, `[1]`, `[2]`, etc. — and `[*]` pulls an attribute across every copy at once.
+- The pitfall: `count` indices are positions, not identities. Removing or reordering an earlier list element shifts every later position, which Terraform reads as "these resources changed" — triggering replacements you didn't ask for.
+- When list membership changes over time (not just its length), reach for `for_each` instead.
