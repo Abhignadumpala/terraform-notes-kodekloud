@@ -8,20 +8,13 @@
 
 ## Introduction
 
-This article explores Terraform's `count` meta-argument for creating multiple resource instances and discusses issues with modifying the underlying list used with `count`.
-
 In this guide, we explore how the `count` meta-argument can be used to create multiple resource instances and discuss potential issues when modifying the underlying list used with `count`. This guide covers both static and dynamic count techniques to help you manage resources efficiently.
-
-`count` (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) lets you create **N identical copies** of a resource from a single `resource` block — no copy-pasting the same block over and over just to change a name or a number. We'll cover both ways of setting `N`:
-
-- **Static count** — a hardcoded number, `count = 3`.
-- **Dynamic count** — driven by a list's size, `count = length(var.some_list)`, so the number of resources tracks the number of items in that list.
-
-Dynamic count is where things get interesting: it looks like it "just works" when you add or remove items from the list, but removing or reordering an item earlier in the list doesn't do what you'd expect — it shifts every resource after it and replaces them, when you only meant to touch one. That's the pitfall this module (and the lab) walks through in detail, before you hit it for real in your own code.
 
 ---
 
-## What is the Count Meta-Argument?
+## What is Count Meta-Argument?
+
+The `count` meta-argument (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) is a Terraform feature that allows you to create multiple identical copies of a resource without writing the same resource block multiple times.
 
 **How it works:**
 - Add `count = N` to a resource block
