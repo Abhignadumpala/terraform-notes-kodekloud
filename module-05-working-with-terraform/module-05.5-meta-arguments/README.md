@@ -2,8 +2,6 @@
 
 > Special arguments that work on any resource block — controlling creation order, lifecycle, and how many copies get created
 
-> 🧪 **Hands-on lab:** pending — code and screenshots to follow.
-
 ---
 
 ## Introduction
@@ -109,6 +107,10 @@ resource "aws_instance" "web" {
 
 **When to use it:** Only when Terraform genuinely can't see the dependency — e.g. an IAM policy that has to exist before code that assumes it runs, with no direct attribute reference tying them together. If a resource already references another resource's attribute (like `security_groups = [aws_security_group.web.id]`), Terraform infers the order automatically and `depends_on` is redundant.
 
+From the [Module 3.8 explicit-dependency lab](../../module-03-terraform-basics/module-03.8-resource-dependencies-in-terraform/README.md) — an EC2 instance's IAM instance profile only works once the role policy is attached, but nothing in `aws_instance.app_server` references `aws_iam_role_policy.ec2_s3_read` directly, so `depends_on` spells it out:
+
+![aws_iam_role_policy.ec2_s3_read next to aws_instance.app_server with depends_on = [aws_iam_role_policy.ec2_s3_read], commented "EXPLICIT DEPENDENCY: policy must be attached before the instance boots and assumes the role"](images/01-depends-on-explicit-dependency.png)
+
 ---
 
 ### 2. `lifecycle`
@@ -127,6 +129,12 @@ resource "aws_instance" "web" {
 ```
 
 **When to use it:** Production resources that can't tolerate downtime, critical databases, anything where the default destroy-then-create behavior is a problem.
+
+From the [Module 5.3 lifecycle-rules lab](../module-05.3-lifecycle-rules/hands-on-lab/README.md) — the same `create_before_destroy` in real code, and the effect it has on the plan when the AMI changes:
+
+![ec2_instance.tf with lifecycle { create_before_destroy = true, ignore_changes = [tags] }](images/02-lifecycle-create-before-destroy-code.png)
+
+![terraform plan header reading +/- create replacement and then destroy — new instance created before the old one is destroyed](images/03-lifecycle-plan-create-before-destroy.png)
 
 ---
 
@@ -159,6 +167,41 @@ resource "aws_instance" "app" {
 | **`depends_on`** | Terraform can't infer a real dependency on its own | EC2 waits for a security group with no direct attribute reference |
 | **`lifecycle`** | You need to control how a resource is replaced | `create_before_destroy` for zero-downtime updates |
 | **`count`** | You need N identical copies of a resource | Three EC2 instances, indexed `0`, `1`, `2` |
+
+---
+
+## Summary Table — All Meta-Arguments
+
+Terraform has 7 meta-arguments in total. This module only went deep on the first three (`depends_on`, `lifecycle`, `count`) — `for_each`, `provider`, `provisioner`, and `timeouts` are here for the full picture, with their own modules or callouts coming later.
+
+| Meta-Argument | Purpose | Common Use |
+|---|---|---|
+| `depends_on` | Explicit dependencies | Control creation order |
+| `count` | Create multiple instances | Simple looping |
+| `for_each` | Iterate over maps/lists | Advanced looping |
+| `lifecycle` | Control replacement | Zero-downtime updates |
+| `provider` | Specify which provider | Multi-region/account |
+| `provisioner` | Run scripts | NOT recommended ❌ |
+| `timeouts` | Operation duration limits | Slow resources |
+
+---
+
+## How Many Meta-Arguments?
+
+**7 meta-arguments in Terraform:**
+
+- ✅ `depends_on` — control order
+- ✅ `count` — create N copies
+- ✅ `for_each` — iterate over a map/list
+- ✅ `lifecycle` — control replacement
+- ✅ `provider` — multi-region / multi-account
+- ⚠️ `provisioner` — avoid where possible
+- ✅ `timeouts` — operation limits
+
+**Most important 3:**
+1. `depends_on` — control order
+2. `count` — create multiple
+3. `for_each` — advanced looping
 
 ---
 

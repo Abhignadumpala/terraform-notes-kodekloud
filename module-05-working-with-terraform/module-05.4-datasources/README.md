@@ -2,8 +2,6 @@
 
 > Reading information from resources that already exist outside your Terraform config, instead of hardcoding it
 
-> 🧪 **Hands-on lab:** pending — code and screenshots to follow.
-
 ---
 
 ## Introduction
@@ -151,6 +149,10 @@ owners = ["801119661308"]     # Windows (Microsoft)
 ```
 
 Always set `owners` when fetching an AMI by name — it's what keeps the datasource from silently matching a random, untrusted image.
+
+This is exactly the pattern from the [Module 5.3 lifecycle-rules lab](../module-05.3-lifecycle-rules/hands-on-lab/README.md) — two `data "aws_ami"` blocks (Amazon Linux and Ubuntu), each with `most_recent`, `owners`, and a `filter`, with the resource pointing at `data.aws_ami.ubuntu.id`:
+
+![data "aws_ami" "amazon_linux" and data "aws_ami" "ubuntu" blocks, each with most_recent, owners, and a filter, with aws_instance.web referencing data.aws_ami.ubuntu.id](images/02-ec2-instance-tf-ami-datasource-example.png)
 
 ---
 
