@@ -140,6 +140,18 @@ resource "aws_instance" "web" {
 
 **Why:** Never hardcode an AMI ID. When AWS publishes a newer patched image matching the filter, the next `terraform apply` picks it up.
 
+**What's `owners` for?** It's a filter on *who published the AMI* — the AWS account ID. `"099720109477"` is Canonical (the company behind Ubuntu). Without it, `filter` alone can match community or unofficial copies with a similar name — untrusted, possibly outdated. With `owners` set, you're only searching AMIs published by that specific account, so you know it's the real thing.
+
+Common values:
+```hcl
+owners = ["amazon"]           # Amazon Linux
+owners = ["099720109477"]     # Ubuntu (Canonical)
+owners = ["309956199498"]     # RHEL (Red Hat)
+owners = ["801119661308"]     # Windows (Microsoft)
+```
+
+Always set `owners` when fetching an AMI by name — it's what keeps the datasource from silently matching a random, untrusted image.
+
 ---
 
 ### 2. Fetch a VPC by Tag
