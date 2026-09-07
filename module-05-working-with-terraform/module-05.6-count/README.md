@@ -8,28 +8,32 @@
 
 ## Introduction
 
+This article explores Terraform's `count` meta-argument for creating multiple resource instances and discusses issues with modifying the underlying list used with `count`.
+
 In this guide, we explore how the `count` meta-argument can be used to create multiple resource instances and discuss potential issues when modifying the underlying list used with `count`. This guide covers both static and dynamic count techniques to help you manage resources efficiently.
 
 ---
 
 ## What is Count Meta-Argument?
 
-The `count` meta-argument (briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md)) is a Terraform feature that allows you to create multiple identical copies of a resource without writing the same resource block multiple times.
+The `count` meta-argument is a Terraform feature that allows you to create multiple identical copies of a resource without writing the same resource block multiple times. (Briefly introduced in [Module 5.5](../module-05.5-meta-arguments/README.md).)
 
 **How it works:**
 - Add `count = N` to a resource block
-- Terraform creates `N` copies of that resource
-- Each copy gets a numeric index: `[0]`, `[1]`, `[2]`, ... `[N-1]`
-- `count.index` inside the block gives the current copy's index
+- Terraform automatically creates N copies of that resource
+- Each copy gets a unique index: `[0]`, `[1]`, `[2]`, ... `[N-1]`
+- Use `count.index` to access the current copy's index
+
+**Simple Example:**
 
 ```hcl
 resource "aws_instance" "app" {
-  count         = 3 # creates 3 EC2 instances
+  count         = 3  # Creates 3 EC2 instances
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"
 
   tags = {
-    Name = "instance-${count.index}" # instance-0, instance-1, instance-2
+    Name = "instance-${count.index}"  # Names: instance-0, instance-1, instance-2
   }
 }
 ```
