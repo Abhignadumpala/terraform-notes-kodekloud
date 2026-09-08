@@ -219,7 +219,7 @@ resource "aws_instance" "web" {
 
 **Why:** `web[0]` is tied to position 0, and position 0's value changed from `"web-1"` to `"web-2"` — that's just a `Name` tag change, and `tags` isn't a ForceNew attribute, so Terraform updates it in place: same instance, new tag. Same story for `web[1]`. And `web[2]` — position 2 doesn't exist in the new list at all, so it's destroyed. Removing *one* name from the front of the list still ends up touching *every* resource after it — two instances silently relabeled plus one real deletion, instead of the one deletion you actually wanted. Here it's "only" a tag drifting quietly out of sync with what actually created the instance; if the position-shifted attribute *were* ForceNew (like `ami`), those same two resources would show `must be replaced` instead of updated in place — same root cause, more expensive outcome.
 
-**The fix:** `for_each` (covered next, in Module 5.7) keys each resource by a stable *value* instead of a position, so removing one item only touches that one item. Until then, the rule with `count` over a list is: only ever append to the end, or accept that removing/reordering earlier elements will touch — update or replace, depending on the attribute — everything after them.
+**The fix:** `for_each` (covered next, in [Module 5.7](../module-05.7-for-each/README.md)) keys each resource by a stable *value* instead of a position, so removing one item only touches that one item. Until then, the rule with `count` over a list is: only ever append to the end, or accept that removing/reordering earlier elements will touch — update or replace, depending on the attribute — everything after them.
 
 See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced against real AWS instances.
 
@@ -237,7 +237,7 @@ See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced again
 - Named resources you reference often
 - Complex configurations where you need readable names
 
-**Better alternative:** Use `for_each` (Module 5.7) when list order matters or when you add/remove items
+**Better alternative:** Use `for_each` ([Module 5.7](../module-05.7-for-each/README.md)) when list order matters or when you add/remove items
 
 ---
 
@@ -273,4 +273,4 @@ Practice using the `count` meta-argument in your Terraform projects to automate 
 
 **Important:** Always remember that count indices are fragile when list order changes — the actual damage (silent tag drift vs. a real replacement) depends on which attribute is keyed by `count.index`.
 
-**Better alternative:** Use `for_each` (Module 5.7) when you need to add/remove items without replacing everything.
+**Better alternative:** Use `for_each` ([Module 5.7](../module-05.7-for-each/README.md)) when you need to add/remove items without replacing everything.
