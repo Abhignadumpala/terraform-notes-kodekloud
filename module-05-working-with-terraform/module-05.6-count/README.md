@@ -193,31 +193,33 @@ resource "aws_instance" "web" {
 **After removing `"web-1"`** (`web_server_names = ["web-2", "web-3"]`): the list only has 2 elements now, but position 0 holds `"web-2"` and position 1 holds `"web-3"`.
 
 ```
-# aws_instance.web[0] must be replaced
--/+ resource "aws_instance" "web" {
+# aws_instance.web[0] will be updated in-place
+~ resource "aws_instance" "web" {
+      id = "i-0123456789"
     ~ tags = {
-        ~ "Name" = "web-1" -> "web-2"   # position 0's value changed — replace it
+        ~ "Name" = "web-1" -> "web-2"   # position 0's value changed
       }
   }
 
-# aws_instance.web[1] must be replaced
--/+ resource "aws_instance" "web" {
+# aws_instance.web[1] will be updated in-place
+~ resource "aws_instance" "web" {
+      id = "i-9876543210"
     ~ tags = {
-        ~ "Name" = "web-2" -> "web-3"   # position 1's value changed — replace it
+        ~ "Name" = "web-2" -> "web-3"   # position 1's value changed
       }
   }
 
 # aws_instance.web[2] will be destroyed
 - resource "aws_instance" "web" {
-    ~ tags = {
-        ~ "Name" = "web-3" -> null      # position 2 no longer exists — destroy it
-      }
+    - tags = {
+        - "Name" = "web-3"
+      } -> null                          # position 2 no longer exists — destroy it
   }
 ```
 
-**Why:** `web[0]` is tied to position 0, and position 0's value changed from `"web-1"` to `"web-2"` — that's a `Name` tag change, so Terraform wants to replace it. Same story for `web[1]`. And `web[2]` — position 2 doesn't exist in the new list at all, so it's destroyed. Removing *one* name from the front of the list ends up touching *every* resource after it: two unwanted replacements plus one real deletion, instead of the one deletion you actually wanted. On instances that's downtime and churn; on anything with `prevent_destroy` or real state (a database, an attached volume), it's a lot worse.
+**Why:** `web[0]` is tied to position 0, and position 0's value changed from `"web-1"` to `"web-2"` — that's just a `Name` tag change, and `tags` isn't a ForceNew attribute, so Terraform updates it in place: same instance, new tag. Same story for `web[1]`. And `web[2]` — position 2 doesn't exist in the new list at all, so it's destroyed. Removing *one* name from the front of the list still ends up touching *every* resource after it — two instances silently relabeled plus one real deletion, instead of the one deletion you actually wanted. Here it's "only" a tag drifting quietly out of sync with what actually created the instance; if the position-shifted attribute *were* ForceNew (like `ami`), those same two resources would show `must be replaced` instead of updated in place — same root cause, more expensive outcome.
 
-**The fix:** `for_each` (covered next, in Module 5.7) keys each resource by a stable *value* instead of a position, so removing one item only touches that one item. Until then, the rule with `count` over a list is: only ever append to the end, or accept that removing/reordering earlier elements will replace everything after them.
+**The fix:** `for_each` (covered next, in Module 5.7) keys each resource by a stable *value* instead of a position, so removing one item only touches that one item. Until then, the rule with `count` over a list is: only ever append to the end, or accept that removing/reordering earlier elements will touch — update or replace, depending on the attribute — everything after them.
 
 See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced against real AWS instances.
 
@@ -231,7 +233,7 @@ See the [hands-on lab](hands-on-lab/README.md) for this pitfall reproduced again
 - Static or predictable lists
 
 ❌ **Don't use `count` for:**
-- Adding/removing items from lists (causes replacements)
+- Adding/removing items from lists (causes index shifting — silent in-place drift at best, unwanted replacements at worst)
 - Named resources you reference often
 - Complex configurations where you need readable names
 
@@ -247,9 +249,9 @@ We examined:
 - ✅ **Static count:** `count = 3` to create a fixed number of identical resources
 - ✅ **Dynamic count:** `count = length(var.list)` to create based on list size
 - ✅ **Accessing resources:** Using `count.index`, `[*]`, and individual indices
-- ✅ **Common pitfall:** Removing elements from count lists causes index shifting and unnecessary resource replacements
+- ✅ **Common pitfall:** Removing elements from count lists causes index shifting — every resource after the removed item gets touched, whether that's a quiet in-place update or a full replacement
 
-The most important lesson: **When using count with lists, be extremely careful about removing or reordering elements**, as this triggers unnecessary resource replacements due to index shifting.
+The most important lesson: **When using count with lists, be extremely careful about removing or reordering elements**, as this triggers index shifting — unnecessary changes across every resource after the removed item, ranging from a silently mislabeled tag to a full replacement.
 
 ---
 
@@ -261,7 +263,7 @@ The most important lesson: **When using count with lists, be extremely careful a
 - ✅ Use `count = length(var.list)` for dynamic count
 - ✅ Use `count.index` to access current iteration
 - ✅ Use `[*]` to access all instances
-- ❌ Avoid removing items from count lists (causes replacements)
+- ❌ Avoid removing items from count lists (causes index shifting — in-place drift or replacements)
 
 ---
 
@@ -269,6 +271,6 @@ The most important lesson: **When using count with lists, be extremely careful a
 
 Practice using the `count` meta-argument in your Terraform projects to automate resource creation and better manage infrastructure changes.
 
-**Important:** Always remember that count indices are fragile when list order changes.
+**Important:** Always remember that count indices are fragile when list order changes — the actual damage (silent tag drift vs. a real replacement) depends on which attribute is keyed by `count.index`.
 
 **Better alternative:** Use `for_each` (Module 5.7) when you need to add/remove items without replacing everything.

@@ -47,11 +47,11 @@ terraform plan
 ```
 
 Expect **not** a clean "1 to destroy." Instead, look for:
-- `aws_instance.web[0]` — `must be replaced` (its `Name` tag moves from `web-prod-1` to `web-prod-2`)
-- `aws_instance.web[1]` — `must be replaced` (its `Name` tag moves from `web-prod-2` to `web-prod-3`)
+- `aws_instance.web[0]` — updated in place (its `Name` tag moves from `web-prod-1` to `web-prod-2`)
+- `aws_instance.web[1]` — updated in place (its `Name` tag moves from `web-prod-2` to `web-prod-3`)
 - `aws_instance.web[2]` — `will be destroyed`
 
-Three resources touched, for what should have been a one-instance removal. This is the pitfall from the [module notes](../README.md#️-the-pitfall-index-shifting) happening for real.
+Three resources touched, for what should have been a one-instance removal. This is the pitfall from the [module notes](../README.md#️-the-pitfall-index-shifting) happening for real — just note that `tags` isn't a ForceNew attribute, so `web[0]`/`web[1]` update in place rather than replace (a ForceNew attribute like `ami` would show `must be replaced` instead).
 
 ### 3. (Optional) Apply it and watch the churn
 
@@ -59,7 +59,7 @@ Three resources touched, for what should have been a one-instance removal. This 
 terraform apply
 ```
 
-Watch the log: `web[0]` and `web[1]` actually get destroyed-and-recreated (new instance IDs both times), and `web[2]` is destroyed outright. Only one name was removed from the list, but every instance after it got touched.
+Watch the log: `web[0]` and `web[1]` keep their original instance IDs — only their `Name` tag changes — while `web[2]` is destroyed outright. Only one name was removed from the list, but every instance after it still got touched, just quietly: their tags now describe a name that isn't the one they were actually created with.
 
 ### 4. Clean up
 
