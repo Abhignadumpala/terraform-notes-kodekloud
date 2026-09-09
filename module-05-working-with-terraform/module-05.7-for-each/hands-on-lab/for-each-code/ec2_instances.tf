@@ -2,6 +2,8 @@
 # in var.web_server_names. Unlike the count lab, removing a name from
 # this set should touch only the one instance whose key was removed —
 # nothing shifts.
+
+
 resource "aws_instance" "web" {
   for_each      = var.web_server_names
   ami           = data.aws_ami.ubuntu.id

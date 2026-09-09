@@ -3,6 +3,8 @@
 # Start with all 3, then remove "web-prod-1" and re-run `terraform plan`
 # to confirm only that one instance is touched (compare against the
 # count lab's index-shifting pitfall).
+
+
 variable "web_server_names" {
   description = "Names for the web server instances - for_each keys each instance by name instead of position"
   type        = set(string)
