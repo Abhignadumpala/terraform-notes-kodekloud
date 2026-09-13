@@ -93,6 +93,19 @@ Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
 
 ![terraform apply after recreate - No changes, infrastructure matches configuration](images/07-terraform-apply-no-changes-after-recreate.png)
 
+## The Recovery Path I Didn't Take: Restoring From S3 Version History
+
+Everything above happened because I deleted the state file with `rm` on local disk — there was nothing to recover from, so Terraform's only option was to recreate. That wouldn't have to be the outcome with a **remote** backend that has versioning turned on, which is exactly what [Module 4.2](../module-04.2-terraform-state-considerations/README.md) already sets up for every real backend in this repo.
+
+If `terraform.tfstate` in S3 gets deleted or overwritten by mistake, the old version doesn't actually vanish — S3 versioning keeps every prior version of the object. Two ways to get it back, verified against the official docs rather than tested here (this experiment used local state, not S3):
+
+1. **Restore the object version directly in S3** — in the console, find the deleted/previous version of the state object and restore it as the current version. Once that's done, the very next `terraform plan` just reads the restored file like nothing happened. No Terraform command needed at all.
+2. **`terraform state push`** — if I've got an old state file locally (downloaded from an S3 version, or a `.tfstate.backup`), this uploads it as the new remote state. It's not a blind overwrite though: Terraform checks the file's `lineage` (refuses to push a state from a completely different project) and its `serial` (refuses to push an *older* serial over a *newer* one already sitting in the backend, since that would silently lose whatever changes happened since). `-force` skips both checks — HashiCorp's own docs call this "not recommended," since it's exactly how you'd overwrite newer real state with stale data by accident.
+
+Either path avoids the entire duplicate-instance problem from this experiment, because state never actually goes missing — it just needs a bucket with versioning turned on, which is the whole reason [Module 4.2](../module-04.2-terraform-state-considerations/README.md#why-amazon-s3) calls versioning out as a must-have, not a nice-to-have.
+
+---
+
 ## Follow-Up: Does `destroy` Get the Orphan Too, or Just the Tracked One?
 
 Natural next question — with two real instances running and only one of them in state, does `terraform destroy` clean up both, or only the one Terraform actually knows about?
@@ -183,6 +196,18 @@ Console confirms both instances are finally gone:
 ### What This Adds
 
 `import` isn't "make Terraform aware of this resource in addition to what it already manages" — it's "bind this specific real resource to this specific resource *address*." Since `aws_instance.web_server` can only ever point at one real instance at a time, recovering an orphan needs that address to be free first (here, freed by destroying the other instance that was occupying it). If both instances had needed to stay alive and managed simultaneously, the fix would've been adding a second `resource "aws_instance"` block and importing into *that* address instead.
+
+**Importing into a `count`/`for_each` address:** this lab only has one plain `aws_instance.web_server`, so a bare address was enough. If the resource block instead uses `count` or `for_each` — like the [5.6](../../module-05-working-with-terraform/module-05.6-count/README.md) and [5.7](../../module-05-working-with-terraform/module-05.7-for-each/README.md) labs — the address needs the index or key too, quoted so the shell doesn't mangle the brackets:
+
+```bash
+# count — import into a specific numbered slot
+terraform import 'aws_instance.web[0]' i-0123456789abcdef0
+
+# for_each — import into a specific key
+terraform import 'aws_instance.web["web-prod-1"]' i-0123456789abcdef0
+```
+
+Same rule as always: the address just has to already exist in the config (the `resource` block with `count`/`for_each` set), and be free — not already pointing at a different real instance.
 
 ## Takeaway
 
