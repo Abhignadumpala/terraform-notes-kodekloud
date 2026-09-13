@@ -108,27 +108,29 @@ User B: terraform apply    User B: terraform apply (waits for lock)
         ❌ Conflict!              ✅ Waits automatically
 ```
 
-### **Locking Mechanism (DynamoDB)**
+### **Locking Mechanism (Native S3 — Terraform 1.10+)**
 
 ```hcl
 # backend.tf
 terraform {
   backend "s3" {
-    bucket           = "my-state"
-    key              = "prod/terraform.tfstate"
-    region           = "us-east-1"
-    dynamodb_table   = "terraform-locks"  # ← Enables locking
-    encrypt          = true
+    bucket       = "my-state"
+    key          = "prod/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true  # ← Enables locking, no DynamoDB table needed
+    encrypt      = true
   }
 }
 ```
+
+> ⚠️ **Correction:** this section used to show `dynamodb_table` as the way to enable locking. As of Terraform 1.10+, that's deprecated — `use_lockfile = true` does the same job directly through S3, with no separate DynamoDB table to create, pay for, or keep in sync. `dynamodb_table` still works for older Terraform versions or existing setups mid-migration. Full setup, IAM permissions, and a real hands-on migration from `dynamodb_table` to `use_lockfile` are in **[Module 4.2](../module-04.2-terraform-state-considerations/README.md#setting-up-s3-as-a-remote-backend)**.
 
 ### **How it Works:**
 
 ```
 User A wants to plan:
 ├─ terraform plan
-├─ Acquires lock in DynamoDB table
+├─ Acquires the lock (a lock file in S3, or a DynamoDB record on older setups)
 ├─ Gets latest state
 ├─ Shows plan
 └─ Releases lock
@@ -204,7 +206,7 @@ This section used to stop at "re-run `terraform apply` to fix it" — that's onl
 Backend = WHERE Terraform stores the state file
 
 Local (Default)          Remote (Production)
-└─ terraform.tfstate     ├─ S3 + DynamoDB
+└─ terraform.tfstate     ├─ S3 (native locking, Terraform 1.10+)
    └─ In current dir     ├─ Terraform Cloud
                          ├─ Azure Storage
                          └─ GCS
@@ -229,7 +231,7 @@ Cons:
   ❌ Hard to backup
 ```
 
-### **Remote Backend (S3 + DynamoDB)**
+### **Remote Backend (S3, Native Locking)**
 
 ```
 How it works:
@@ -238,19 +240,19 @@ Terraform CLI
      └─ S3 Bucket ← State file
         ├─ Encrypted at rest
         ├─ Versioning enabled
-        └─ Access controlled via IAM
-
-DynamoDB Table
-  └─ State locks (prevents concurrent edits)
+        ├─ Access controlled via IAM
+        └─ Lock file also stored here (use_lockfile = true)
+           — no separate DynamoDB table needed, Terraform 1.10+
 
 Pros:
   ✅ Team collaboration
   ✅ Automatic locking
   ✅ Encryption & versioning
   ✅ Audit trail
+  ✅ One less piece of infrastructure to run/pay for than the old DynamoDB setup
 
 Cons:
-  ⚠️ Slightly more setup
+  ⚠️ Slightly more setup than local
 ```
 
 ### **Backend Configuration**
@@ -259,14 +261,16 @@ Cons:
 # backend.tf
 terraform {
   backend "s3" {
-    bucket           = "my-terraform-state"
-    key              = "prod/terraform.tfstate"
-    region           = "us-east-1"
-    encrypt          = true
-    dynamodb_table   = "terraform-locks"
+    bucket       = "my-terraform-state"
+    key          = "prod/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 ```
+
+(On Terraform versions before 1.10, use `dynamodb_table = "terraform-locks"` instead — see [Module 4.2](../module-04.2-terraform-state-considerations/README.md) for the full migration path from one to the other.)
 
 ---
 
@@ -402,7 +406,7 @@ terraform plan
 |---------|-----------|-----------|
 | **State File** | Infrastructure memory | Always needed |
 | **Local State** | File on your computer | Learning only |
-| **Remote State** | S3 + DynamoDB | Production/teams |
+| **Remote State** | S3 (native locking, Terraform 1.10+) | Production/teams |
 | **Locking** | Prevents conflicts | Multi-user teams |
 | **Backup** | Copy of state | Disaster recovery |
 | **Drift** | Actual vs. desired | Detecting changes |
@@ -421,7 +425,7 @@ terraform plan
    └─ Contains plaintext passwords
 
 3️⃣ Use Remote Backend in Production
-   └─ S3 + DynamoDB + Encryption
+   └─ S3 + native locking (use_lockfile) + Encryption
 
 4️⃣ Enable Locking for Teams
    └─ Prevents concurrent modifications
@@ -453,7 +457,7 @@ Team/Production:
   ☐ Use remote backend (S3)
   ☐ Enable encryption at rest
   ☐ Enable versioning
-  ☐ Use DynamoDB for locking
+  ☐ Enable locking (use_lockfile on Terraform 1.10+, or DynamoDB on older versions)
   ☐ Restrict IAM access
   ☐ Enable audit logging (CloudTrail)
   ☐ Never commit to Git
