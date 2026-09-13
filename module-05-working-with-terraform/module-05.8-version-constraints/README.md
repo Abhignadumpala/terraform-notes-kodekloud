@@ -124,15 +124,19 @@ terraform {
 }
 ```
 
-Terraform picks the **highest version that satisfies every clause** in the list — so with the constraint above, it'd land on the newest `5.x` release below `6.0.0` that isn't `5.70.0`.
+Terraform picks the **highest version that satisfies every condition** in the list — so with the constraint above, it'd land on the newest `5.x` release below `6.0.0` that isn't `5.70.0`.
 
 ---
 
 ## The Pessimistic Constraint Operator (`~>`)
 
-Writing out `> 5.0.0, < 6.0.0` by hand every time is tedious, and this exact pattern — "stay within this major (or minor) version, take any patch/minor bump" — is common enough that Terraform has a dedicated operator for it: `~>`, the **pessimistic constraint operator**.
+Typing `> 5.0.0, < 6.0.0` by hand every time gets old fast. And "let small updates through, but block anything that might break my config" is such a common thing to want that Terraform gives it its own shortcut: `~>`.
 
-**With two version components** (`~> 5.60`), only the last component is allowed to increment:
+It's officially called the "pessimistic constraint operator," but ignore the fancy name — all it means is *"be cautious. Assume a bigger version bump might break something, so only auto-update the small stuff."*
+
+**The simple rule: count how many numbers you typed after `~>`. Terraform locks all of them except the very last one — only that last number is allowed to go up.**
+
+**Example with two numbers — `~> 5.60`:**
 
 ```hcl
 terraform {
@@ -145,9 +149,9 @@ terraform {
 }
 ```
 
-This allows `5.60`, `5.61`, ... `5.99`, but **not** `6.0`. Equivalent to `>= 5.60.0, < 6.0.0`.
+I typed two numbers (`5` and `60`), so the `5` is locked and only the `60` can move. That means Terraform can install `5.60`, `5.61`, all the way up to `5.99` — but the second it would need `6.0`, it stops. Same as writing `>= 5.60.0, < 6.0.0`, just shorter.
 
-**With three version components** (`~> 5.60.0`), the constraint tightens to only the patch number moving:
+**Example with three numbers — `~> 5.60.0`:**
 
 ```hcl
 terraform {
@@ -160,9 +164,11 @@ terraform {
 }
 ```
 
-This allows `5.60.0`, `5.60.1`, ... `5.60.99`, but **not** `5.61.0`. Equivalent to `>= 5.60.0, < 5.61.0`.
+Now I typed three numbers, so the first two (`5` and `60`) are locked, and only the last one (`0`) can move. Terraform can install `5.60.0`, `5.60.1`, up to `5.60.99` — but not `5.61.0`. Adding that third number tightened the range a lot. Same as writing `>= 5.60.0, < 5.61.0`.
 
-Running `terraform init` with that second constraint:
+So the more numbers I write after `~>`, the tighter the range gets — because I'm locking one more digit in place each time.
+
+Running `terraform init` with that three-number version:
 
 ```
 Initializing the backend...
@@ -175,7 +181,7 @@ Initializing provider plugins...
 Terraform has been successfully initialized!
 ```
 
-**Confirmed still accurate against the current Terraform docs** — `~>` "allows only the right-most component to increment," and that's exactly what the two examples above show. HashiCorp's own guidance: reusable *modules* should only set a floor (`>= 5.0.0`, so they don't block newer providers unnecessarily), while *root* configurations — like every `.tf` file in this repo's `hands-on-lab/` folders — should use `~>` to pin both a floor and a ceiling.
+**Checked this against the current Terraform docs and it still holds** — `~>` only ever lets the last number move, everything before it is locked. HashiCorp's own advice, in plain terms: if you're writing a reusable piece of Terraform code that other people's projects will plug in (a "module"), just set a minimum version and don't cap it, so you're not the reason someone can't use a newer provider. But for an actual project you run yourself — like every `.tf` file in this repo's `hands-on-lab/` folders — use `~>` so you still get small bugfixes automatically, without ever getting hit by a big breaking change you didn't see coming.
 
 ---
 
@@ -183,7 +189,7 @@ Terraform has been successfully initialized!
 
 The KodeKloud lesson this note is based on stops at `version` constraints in `required_providers`. What it doesn't mention — because dependency locking existed but wasn't emphasized the same way yet — is the **`.terraform.lock.hcl`** file that `terraform init` generates in the same directory.
 
-Here's the distinction that actually matters: `version` in `required_providers` defines a *range* of acceptable versions. The lock file records the *one exact version* Terraform actually picked from that range, plus its checksums, so that every future `init` — on my machine, a teammate's, or CI — reuses that exact version instead of silently drifting to a newer one that also happens to satisfy the constraint.
+Here's the distinction that actually matters: `version` in `required_providers` defines a *range* of acceptable versions. The lock file records the *one exact version* Terraform actually picked from that range, plus a fingerprint of the downloaded provider file so Terraform can tell if it ever changes unexpectedly. That way, every future `init` — on my machine, a teammate's, or a CI server — reuses that exact version instead of silently drifting to a newer one that also happens to satisfy the constraint.
 
 I've seen this directly in this repo's own lab runs. Every `terraform init` in the [5.6](../module-05.6-count/hands-on-lab/README.md) and [5.7](../module-05.7-for-each/hands-on-lab/README.md) labs prints:
 
@@ -210,9 +216,9 @@ Every `hands-on-lab/*/` folder in this repo tracks its `.terraform.lock.hcl` in 
 
 ✅ **Pessimistic, three-part (`~> 5.60.0`)** — patch releases only. Good default for anything I want to stay put but still pick up bugfixes for.
 
-✅ **Pessimistic, two-part (`~> 5.60`)** — minor and patch releases, no major bumps. HashiCorp's suggested default for root modules.
+✅ **Pessimistic, two-part (`~> 5.60`)** — minor and patch releases, no major bumps. HashiCorp's suggested default for a project you run yourself.
 
-✅ **Floor only (`>= 5.0.0`)** — appropriate for a reusable *module* meant to work across a wide range of caller-provided provider versions, not for a root config.
+✅ **Floor only (`>= 5.0.0`)** — good for a reusable module (a chunk of Terraform code other people's projects plug in), not for a project you're actually deploying.
 
 ❌ **No constraint at all** — fine for a five-minute throwaway experiment, risky for anything meant to still `apply` cleanly next month.
 
