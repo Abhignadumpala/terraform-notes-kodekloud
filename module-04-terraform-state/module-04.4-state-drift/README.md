@@ -160,3 +160,9 @@ We covered:
 ## Practice & Next Steps
 
 Pick any resource from an existing lab in this repo, change one non-`ForceNew` attribute (like `instance_type`) directly in the AWS console, then run `terraform plan` and watch it get flagged as drift without touching the config first. Try both paths on it: revert with a plain `apply`, then manually re-drift it and adopt the change instead with `-refresh-only` followed by a manual `.tf` edit — confirm `terraform plan` comes back clean only after all three (config, state, reality) agree again.
+
+---
+
+## Related Notes
+
+- [Module 4.5: State Loss and Recovery](../module-04.5-state-loss-and-recovery/README.md) — the sibling failure mode: instead of state and reality quietly disagreeing, state goes missing entirely. Different cause, different fix (recreate or `import`, not `-refresh-only`)

@@ -190,7 +190,7 @@ Starting a new project, I'd reach for native S3 locking from day one. For anythi
 - [Hands-On Lab: S3 Backend + Native State Locking](hands-on-lab/README.md) — bootstrap the backend, migrate real state onto it, trigger and resolve a real lock conflict, then tear it all down
 - [Module 04.0: Introduction to Terraform State](../module-04.0-introduction-to-terraform-state/)
 - [Module 04.1: Purpose of State](../module-04.1-purpose-of-state/) — what the state file tracks and why
-- [Experiment: What Happens If You Delete the State File?](../state-file-deletion-experiment/README.md) — what actually happens without a backup or a lock
+- [Module 4.5: State Loss and Recovery](../module-04.5-state-loss-and-recovery/README.md) — what actually happens without a backup or a lock, and how to recover
 
 ## Official Resources
 

@@ -1,6 +1,8 @@
-# Experiment: What Happens If You Delete the State File?
+# 📘 Module 4.5: State Loss and Recovery
 
-> Related to [Module 04.2: Terraform State Considerations](../module-04.2-terraform-state-considerations/README.md) — that note covers why state needs to live somewhere with versioning, since it's genuinely hard to reconstruct by hand if it's lost. I wanted to actually see what "hard to reconstruct" looks like, so I deleted it on purpose.
+> An experiment, not a lecture: what actually happens when `terraform.tfstate` disappears, and the recovery paths back from it — tested for real against a live EC2 instance, not just described.
+
+Related to [Module 4.2: Terraform State Considerations](../module-04.2-terraform-state-considerations/README.md) — that note covers why state needs to live somewhere with versioning, since it's genuinely hard to reconstruct by hand if it's lost. I wanted to actually see what "hard to reconstruct" looks like, so I deleted it on purpose.
 
 Ran this against the EC2 instance from the [Module 5.2 mutable-vs-immutable lab](../../module-05-working-with-terraform/module-05.2-mutable-vs-immutable-infrastructure/hands-on-lab/README.md), which was still up and running.
 
@@ -214,3 +216,12 @@ Same rule as always: the address just has to already exist in the config (the `r
 Deleting state doesn't make Terraform "notice" anything is missing — it makes Terraform **forget the real infrastructure exists at all**. `plan`/`apply` fall back to their only other job: making reality match config, which here meant building a second copy from scratch. Drift detection depends entirely on state being present and accurate; with no state, there's nothing to detect drift *against*.
 
 This is the concrete version of [Module 04.2](../module-04.2-terraform-state-considerations/README.md)'s point about state needing versioning and backups — the failure mode isn't a scary error message, it's a silently duplicated, silently orphaned, silently billable resource.
+
+---
+
+## Related Notes
+
+- [Module 4.1: Purpose of State](../module-04.1-purpose-of-state/README.md) — why state exists at all; this note is what happens when it's gone
+- [Module 4.2: Terraform State Considerations](../module-04.2-terraform-state-considerations/README.md) — the versioning/backend setup that turns "state is gone forever" into "restore an old version"
+- [Module 4.4: State Drift](../module-04.4-state-drift/README.md) — the sibling failure mode: state and reality disagree but state still *exists*. This note is the more extreme case — state disagreeing with reality because it's missing entirely
+- [Module 5.2: Mutable vs. Immutable Infrastructure](../../module-05-working-with-terraform/module-05.2-mutable-vs-immutable-infrastructure/README.md) — the lab and instance this experiment was run against
