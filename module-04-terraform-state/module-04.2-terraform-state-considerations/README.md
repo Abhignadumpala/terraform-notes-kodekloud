@@ -112,7 +112,9 @@ For an AWS-based setup, S3 is the natural place to put state:
 **5. Set the right IAM permissions.** Whoever (or whatever CI job) runs Terraform needs, at minimum:
 - `s3:ListBucket` on the bucket
 - `s3:GetObject` and `s3:PutObject` on the state file
-- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lock file (a fixed name, `.terraform.lock.terraform`, sitting next to the state file — confirmed in [the hands-on lab](hands-on-lab/README.md))
+- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the lock file — confirmed in [the hands-on lab](hands-on-lab/README.md) that my bucket actually got a fixed-name file, `.terraform.lock.terraform`, sitting next to the state file
+
+  > 📌 **Diverges from the current official docs.** HashiCorp's S3 backend docs say the native lock file should be named `<state key>.tflock` (e.g. `project/terraform.tfstate.tflock`), not `.terraform.lock.terraform`. My real bucket had the latter, and `terraform force-unlock` itself went looking for the `.tflock` name and failed to find it — see [the lab's step 5](hands-on-lab/README.md#5-simulate-a-held-lock) for the full mismatch. Likely explanation: the Terraform CLI version I ran this lab against predates whatever release settled on the `.tflock` naming the docs describe now. Worth re-checking the actual filename in your own bucket rather than trusting either source blindly — grant IAM permissions on whatever name shows up for real.
 
 **6. Point the backend block at the bucket:**
 

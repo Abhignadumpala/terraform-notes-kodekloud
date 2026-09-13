@@ -91,11 +91,11 @@ Developer 2's next `apply` is working off stale information — it doesn't know 
 # backend.tf
 terraform {
   backend "s3" {
-    bucket         = "my-company-terraform-state"
-    key            = "prod/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-locks"  # for state locking
+    bucket       = "my-company-terraform-state"
+    key          = "prod/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true  # native S3 locking — see Module 4.2
   }
 }
 ```
@@ -132,6 +132,6 @@ Everything else — how data sources are stored, why `Reading...` differs from `
 
 ## Official Resources
 
-- [Terraform State Documentation](https://www.terraform.io/language/state)
-- [Terraform Backend Configuration](https://www.terraform.io/language/settings/backends/configuration)
-- [S3 Backend Reference](https://www.terraform.io/language/settings/backends/s3)
+- [Terraform State Documentation](https://developer.hashicorp.com/terraform/language/state)
+- [Terraform Backend Configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration)
+- [S3 Backend Reference](https://developer.hashicorp.com/terraform/language/backend/s3)
