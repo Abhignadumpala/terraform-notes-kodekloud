@@ -90,6 +90,25 @@ Only once all three — config, state, and the real instance — say `t2.small` 
 
 ---
 
+## Is This Permanent? Do I Have to Keep Refreshing?
+
+No — adopting a change is a **one-time fix**, not something I repeat forever. Once state and my `.tf` file both say `t2.small`, Terraform treats `t2.small` as the correct, expected value from then on and manages it completely normally. I'd only run `-refresh-only` again if a *different* manual change happened later that I also wanted to keep.
+
+---
+
+## This Isn't What `terraform import` Is For
+
+Easy to mix these up, since both involve "AWS has something Terraform didn't put there" — but they're solving different problems:
+
+| Situation | What Terraform already knows | Fix |
+|---|---|---|
+| **Drift** (this note) | The resource is already in my state file — Terraform created it. Someone just changed one of its *attributes* outside Terraform. | `apply -refresh-only` + hand-edit my `.tf` file. **No `import` involved.** |
+| **Untracked resource** | The resource isn't in my state file **at all**. The whole thing was created by hand, outside Terraform, from scratch. | `terraform import` (or the newer `import` block) to add it to state, **plus** I still have to write the matching `.tf` resource block myself — import only updates state, same as `-refresh-only` does. |
+
+The test: if Terraform already created the resource and someone just tweaked an attribute afterward, that's drift — `import` has nothing to do with it. `import` is only for a resource Terraform has zero history with, like an instance a teammate launched by hand in the console that I now want Terraform to start managing.
+
+---
+
 ## Quick Reference
 
 | Command | What it touches | Use it when |
