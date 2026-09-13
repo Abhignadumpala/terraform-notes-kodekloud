@@ -185,6 +185,50 @@ terraform destroy
 | Removing `web-prod-1` | Delete exactly 1 instance — the one named `web-prod-1` | `terraform plan` shows `1 to destroy`, nothing else touched | Matched exactly — `Plan: 0 to add, 0 to change, 1 to destroy`, only `web-prod-1` in the plan |
 | `web-prod-2` / `web-prod-3` | Untouched | Never appear in the plan or apply log | Confirmed — same instance IDs (`i-0c4e346773945b893`, `i-0d5603c2cc39ba122`) before and after, never mentioned in either the plan or the apply log |
 
+**Same baseline deploy, two addressing styles — side by side.** Both plans say `Plan: 3 to add, 0 to change, 0 to destroy`. The difference that matters is what each *instance* is called in the log:
+
+`for_each` (this lab):
+
+```
+aws_instance.web["web-prod-2"]: Creation complete after 15s [id=i-0c4e346773945b893]
+aws_instance.web["web-prod-1"]: Creation complete after 15s [id=i-036fab9252ebea498]
+aws_instance.web["web-prod-3"]: Creation complete after 15s [id=i-0d5603c2cc39ba122]
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+web_prod_2_instance_id = "i-0c4e346773945b893"
+web_server_ids = {
+  "web-prod-1" = "i-036fab9252ebea498"
+  "web-prod-2" = "i-0c4e346773945b893"
+  "web-prod-3" = "i-0d5603c2cc39ba122"
+}
+web_server_names_by_key = {
+  "web-prod-1" = "web-prod-1"
+  "web-prod-2" = "web-prod-2"
+  "web-prod-3" = "web-prod-3"
+}
+```
+
+`count` ([5.6's baseline apply](../../module-05.6-count/hands-on-lab/README.md)):
+
+```
+aws_instance.web[1]: Creation complete after 15s [id=i-02fcf3e7d834efa74]
+aws_instance.web[0]: Creation complete after 15s [id=i-094e7e4fc1d3092b4]
+aws_instance.web[2]: Creation complete after 15s [id=i-09eb5ffdcd98ac0e1]
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+
+web_server_names_by_index = {
+  "0" = "web-prod-1"
+  "1" = "web-prod-2"
+  "2" = "web-prod-3"
+}
+```
+
+Notice `for_each`'s log already tells you *which server* each line is about — `web["web-prod-2"]` — while `count`'s log only tells you *which slot* — `web[1]` — and you'd have to cross-reference `web_server_names_by_index` separately to know that slot `1` means `web-prod-2`. That readability gap is the same root cause as the removal pitfall: `count` identity is a position, `for_each` identity is the value itself.
+
 **Why this happens:** `for_each` keys each instance by the string value itself (`each.key` = `"web-prod-1"`), not by its position in the set. Removing `"web-prod-1"` from `variables.tf` just makes that one key disappear from the map Terraform is iterating over — `web-prod-2` and `web-prod-3` still have the same keys they always had, so Terraform has no reason to touch them. There's no slot to shift into, because there was never a slot to begin with.
 
 **Direct contrast with [5.6's pitfall](../../module-05.6-count/hands-on-lab/README.md#what-this-confirms):** removing the identical name from the identical starting list produced `2 to change, 1 to destroy` under `count` (with the *wrong* instance — `web-prod-3` — actually getting destroyed), versus a clean `0 to change, 1 to destroy` under `for_each` (with the *right* instance destroyed, `web-prod-1`, exactly as named). Same starting data, same edit, same intent — the only variable is `count` vs `for_each`, and that's the whole difference between a silent-relabeling bug and a plan that does exactly what it says.
