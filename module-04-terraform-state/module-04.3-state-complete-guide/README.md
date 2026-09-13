@@ -181,47 +181,18 @@ resource "aws_s3_bucket_versioning" "state" {
 
 ## **6️⃣ State Drift**
 
-### **What is Drift?**
+Drift = state/config no longer match the real infrastructure, because something changed the real resource outside Terraform.
 
 ```
-Drift = Difference between State & Reality
-
 Example:
-  State says: EC2 t2.micro with 10GB storage
-  Reality: Someone manually changed to t2.small with 20GB
-  
-Result: Terraform doesn't know the instance was modified!
+  State says: EC2 t2.micro
+  Reality: Someone manually changed it to t2.small
+
+Result: Terraform doesn't know the instance was modified,
+until the next `terraform plan` refreshes state and catches it.
 ```
 
-### **How Drift Happens:**
-
-```
-❌ Manual AWS Console changes
-❌ Other tools modify infrastructure
-❌ Someone runs AWS CLI commands
-❌ CloudFormation or other IaC tools
-```
-
-### **Detecting Drift:**
-
-```bash
-# Check for drift
-terraform plan
-
-# If shows modifications needed, drift was detected
-# Re-apply to fix
-terraform apply
-```
-
-### **Preventing Drift:**
-
-```
-✅ Only use Terraform (no manual changes)
-✅ Use IAM policies to restrict manual changes
-✅ Run terraform plan regularly
-✅ Enable CloudTrail for audit logging
-✅ Use Policy as Code (Sentinel)
-```
+This section used to stop at "re-run `terraform apply` to fix it" — that's only half the picture, since sometimes the external change was *correct* and I want to keep it, not undo it. See **[Module 4.4: State Drift](../module-04.4-state-drift/README.md)** for the full breakdown: how `plan` actually detects drift, reverting it vs. deliberately adopting it with `-refresh-only`, and prevention practices.
 
 ---
 
@@ -402,10 +373,7 @@ Without refresh:
   Doesn't know if resources still exist
 
 With refresh:
-  terraform refresh
-  └─ Queries AWS
-  └─ Updates state file
-  └─ Now matches reality
+  Queries AWS, updates state file, now matches reality
 ```
 
 ### **When to Refresh:**
@@ -420,12 +388,11 @@ With refresh:
 ### **Command:**
 
 ```bash
-# Manual refresh
-terraform refresh
-
-# Or included in plan (automatic)
+# terraform plan already refreshes automatically — no separate step needed
 terraform plan
 ```
+
+> ⚠️ **Correction:** this section used to list `terraform refresh` as the manual command for this. That command is **deprecated** — confirmed against the current Terraform CLI docs. Use `terraform plan -refresh-only` or `terraform apply -refresh-only` instead, which let me review the refreshed values before they're written to state (the old `terraform refresh` applied them immediately, with no review step). Full detail in **[Module 4.4: State Drift](../module-04.4-state-drift/README.md)**.
 
 ---
 
