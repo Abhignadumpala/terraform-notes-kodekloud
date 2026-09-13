@@ -168,6 +168,13 @@ $ export TF_VAR_length="2"
 $ terraform apply
 ```
 
+On Windows, in PowerShell, the same thing looks like this:
+
+```powershell
+$env:TF_VAR_filename = "/root/pets.txt"
+$env:TF_VAR_content  = "We love pets!"
+```
+
 In this scenario, Terraform automatically picks up the environment variable values during execution, providing a convenient method for variable assignment.
 
 **✅ Pros:**
@@ -203,7 +210,7 @@ separator = "."
 length   = "2"
 ```
 
-Terraform automatically loads files named `terraform.tfvars`, `terraform.tfvars.json`, or files with extensions like `.auto.tfvars` or `.auto.tfvars.json`. If you use a differently named file (e.g., `variables.tfvars`), be sure to specify it explicitly with the `-var-file` flag:
+Terraform automatically loads files named `terraform.tfvars`, `terraform.tfvars.json`, or files with extensions like `.auto.tfvars` or `.auto.tfvars.json`. If I have more than one `*.auto.tfvars` file in the same folder, Terraform loads them in **alphabetical order by filename** — so if `a.auto.tfvars` and `z.auto.tfvars` both set the same variable, `z.auto.tfvars` wins, purely because "z" comes after "a." Worth knowing before naming a bunch of auto-loaded files and assuming they're independent. If you use a differently named file (e.g., `variables.tfvars`), be sure to specify it explicitly with the `-var-file` flag:
 
 ```bash
 $ terraform apply -var-file="variables.tfvars"
@@ -283,7 +290,17 @@ $ terraform apply -var-file="dev.tfvars" -var "instance_count=5"
 
 ## Variable Definition Precedence
 
-Terraform allows you to set variable values from multiple sources. When the same variable is defined in multiple places, Terraform uses a specific order of precedence to determine which value to apply. Consider the following scenario where a variable is defined in various ways:
+Terraform allows you to set variable values from multiple sources. When the same variable is defined in multiple places, Terraform uses a specific order of precedence to determine which value to apply.
+
+**From highest to lowest priority:**
+
+1. **Command-line flags** — `-var` and `-var-file`, in the order you pass them
+2. **`*.auto.tfvars` / `*.auto.tfvars.json` files** — if there's more than one, Terraform applies them in alphabetical order by filename, so the alphabetically-last one wins between them
+3. **`terraform.tfvars` / `terraform.tfvars.json`**
+4. **Environment variables** (`TF_VAR_` prefix)
+5. **Variable block `default`** — lowest priority, only used if nothing else supplies a value
+
+Consider the following scenario where the same variable is defined in every one of the first four ways at once:
 
 * **Environment Variable:**
   ```bash
@@ -319,18 +336,18 @@ variable "filename" {
 }
 ```
 
-Terraform follows this strict order of precedence when assigning variable values:
-
-| Precedence Level | Example Call or File | Value Used |
+| Priority (1 = wins) | Source | Value it sets |
 |---|---|---|
-| 1. Environment variables (`TF_VAR_`) | `export TF_VAR_filename="/root/cats.txt"` | `/root/cats.txt` |
-| 2. terraform.tfvars file | `filename = "/root/pets.txt"` | `/root/pets.txt` |
-| 3. Files ending with `.auto.tfvars` or `.auto.tfvars.json` | `filename = "/root/mypet.txt"` | `/root/mypet.txt` |
-| 4. Command-line flags (`-var` or `-var-file`) | `terraform apply -var "filename=/root/best-pet.txt"` | `/root/best-pet.txt` |
+| 1 | Command-line flag (`-var`) | `/root/best-pet.txt` |
+| 2 | `.auto.tfvars` file | `/root/mypet.txt` |
+| 3 | `terraform.tfvars` file | `/root/pets.txt` |
+| 4 | `TF_VAR_filename` environment variable | `/root/cats.txt` |
 
-Since the command-line flag (`-var`) has the highest precedence in this example, the variable `filename` will ultimately be assigned the value `/root/best-pet.txt`.
+Since the command-line flag (`-var`) has the highest precedence, the variable `filename` will ultimately be assigned the value `/root/best-pet.txt`.
 
 **Remember:** The order in which variable values are applied ensures predictability in your deployment. This hierarchy allows you to override defaults and maintain control over your configuration settings.
+
+> 📌 **Corrected while cross-checking against the official Terraform docs.** The table here used to rank environment variables as "Precedence Level 1" and command-line flags as "Level 4" — the *value* Terraform actually picked was right (the CLI flag), but numbering the winner "4" instead of "1" was backwards from how a precedence table is normally read, and easy to misread as "environment variables win." Fixed so "1" now means "highest priority," matching HashiCorp's own docs. I also compared this against a newer KodeKloud lesson on this same topic: its precedence *diagram* agrees with the order above (environment variables ranked **below** both kinds of `.tfvars` files), but that lesson's own *text* ranks environment variables **above** `.tfvars` files — the diagram and the text in that source disagree with each other. The order above matches the diagram and the official docs, not that text.
 
 ---
 
