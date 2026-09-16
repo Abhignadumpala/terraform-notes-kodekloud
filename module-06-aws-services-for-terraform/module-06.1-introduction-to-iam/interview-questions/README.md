@@ -38,15 +38,18 @@ An EC2 instance isn't an IAM identity — it has no user of its own. Roles exist
 **8. What are some use cases for IAM roles beyond EC2-to-S3 access?**
 Cross-account access, federated/external identity access (e.g. via an org's Active Directory), and any service-to-service permission grant.
 
+**9. What's the difference between a policy and a role?**
+A policy is just a JSON document defining permissions — `Effect`/`Action`/`Resource`, nothing more. A role is an identity that can be *assumed* (by a user, a service, another account) and has one or more policies attached to it. The policy defines what's allowed; the role is what gets the temporary credentials and carries that policy around. A policy on its own grants nothing until it's attached to a user, group, or role.
+
 ---
 
 ### Scenario / Judgment
 
-**9. A developer says a Terraform apply is failing with `AccessDenied` on `s3:PutObject`. What's your troubleshooting approach?**
+**10. A developer says a Terraform apply is failing with `AccessDenied` on `s3:PutObject`. What's your troubleshooting approach?**
 Check which identity Terraform's AWS provider is actually using (user or assumed role), then check whether its attached policies allow that action on that specific bucket/resource — least privilege means the default is deny.
 
-**10. Would you still create an individual IAM user with an access key for a new employee joining today?**
+**11. Would you still create an individual IAM user with an access key for a new employee joining today?**
 Current AWS best practice says no — use federation/IAM Identity Center (SSO) for human users with temporary credentials instead. IAM users with long-term access keys are now recommended only for specific cases (service accounts, exceptions) that federation doesn't cover.
 
-**11. Why did AWS move away from recommending long-term access keys for people?**
+**12. Why did AWS move away from recommending long-term access keys for people?**
 Long-term keys don't expire on their own, so a leaked key stays valid indefinitely unless someone notices and rotates it. Temporary credentials (from federation or roles) expire automatically, shrinking the blast radius of a leak.
