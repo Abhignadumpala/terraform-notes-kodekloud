@@ -33,7 +33,7 @@ That leaves her with two policies — `AdministratorAccess` and the default `IAM
 
 ![Lucy's Permissions policies tab showing AdministratorAccess and IAMUserChangePassword, both attached directly](images/03-lucy-two-policies-attached.png)
 
-I did **not** create an access key for her. Her user summary page flags `Access key 1: Create access key` as a link, not a fact — no key exists. This lines up with what I noted in [6.1](../../module-06.1-introduction-to-iam/README.md): the console itself nudges away from long-lived credentials on a human user now ("As a best practice, avoid using long-term credentials like access keys").
+I did **not** create an access key for her. Her user summary page flags `Access key 1: Create access key` as a link, not a fact — no key exists. That matches what I noted in [6.1](../../module-06.1-introduction-to-iam/README.md): AWS's own guidance is to avoid long-lived credentials on a human user where possible.
 
 ### 2. Abdul, Lee, and the `project-dev` group
 
@@ -98,13 +98,10 @@ That's the piece [6.1's role section](../../module-06.1-introduction-to-iam/READ
 
 ## What I Learned
 
-- Attaching a policy while creating a user isn't offered inline — the permissions step only offers group membership; a direct policy attach is a separate trip to the user's own Permissions tab afterward.
-- A new group is created empty — policies get attached from the group's own Permissions tab in a follow-up step, not during creation.
-- Custom policy authoring can go through access-level checkboxes (`List`, `Read`, `Write`, …) instead of picking individual actions — faster, but coarser: "all List actions" grants the whole category, not just what I actually need.
-- Access keys for a human user aren't handed out by default anymore — the console treats "no access key" as the default state and creating one is something I have to actively opt into.
-
-**Why this happens:** step boundaries in the console have moved — permissions got split out of the creation wizard into the identity's own page — but the underlying objects are unchanged: a user still just holds attached policies, a group still just fans a policy out to its members, and a role still needs a trust policy plus a permissions policy, same as [6.1](../../module-06.1-introduction-to-iam/README.md) lays out.
-
-**What surprised me:** I expected "add a group during user creation" to also mean "attach its policies right there," all in one continuous flow. It doesn't — the group gets created empty, and permissions are a deliberate second step on the group object itself. Small thing, but it means "create a group" and "give it permissions" are two separate, revisitable actions, not one.
+- Attaching a policy to a brand-new user isn't part of the creation wizard — the permissions step there only offers group membership. Attaching a policy directly is a separate trip to the user's own Permissions tab, after the user already exists.
+- A new group is created empty. Its policies get attached separately, from the group's own Permissions tab, after the group already exists — so "create a group" and "give it permissions" are two separate, revisitable actions, not one.
+- A custom policy can be built from access-level checkboxes (`List`, `Read`, `Write`, …) instead of picking individual actions one by one — faster, but coarser: ticking "List" grants the whole category, not just the specific actions I actually need.
+- A human user doesn't get an access key by default. Creating one is a separate, deliberate action, not something bundled into creating the user — and per [6.1](../../module-06.1-introduction-to-iam/README.md), that's the right default to lean into, not just a UI quirk.
+- A role needs two separate JSON documents: a trust policy (who can assume it) and a permissions policy (what it can do once assumed) — the console fills the trust policy in for me once I pick "EC2" as the trusted service, but the permissions policy is whatever I explicitly attach.
 
 **Next up:** wiring this same user/group/policy/role shape with `aws_iam_user`, `aws_iam_group`, `aws_iam_policy`, and `aws_iam_role` resource blocks in Terraform, instead of clicking through the console.
