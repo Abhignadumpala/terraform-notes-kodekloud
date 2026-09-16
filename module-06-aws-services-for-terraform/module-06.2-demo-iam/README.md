@@ -31,7 +31,7 @@ For Lucy I set a custom console password and tick "require password reset on fir
 
 After creation, the console offers a CSV download with her access key ID and secret access key. **This is the only time the secret key is ever shown** — if I lose it, the only fix is to deactivate that key and generate a new one, there's no "view secret again" option.
 
-> **What's changed:** this multi-step "Next: Permissions → Next: Tags → Next: Review" wizard is the older IAM console — current AWS console UI collapses user creation into fewer steps and phrases things differently, though the underlying choices (access type, permissions, tags) are the same. More importantly, AWS's current guidance goes further than "download the CSV and keep it safe": it actively steers away from long-lived access keys on human IAM users at all, pushing federated access through **IAM Identity Center** instead (the point 6.1 already lands on). A lot of accounts now warn — or block outright — on creating a new access key for a console user. Treat this demo's access-key step as "how it used to be done by default," not "what I should do today."
+> AWS's guidance goes further than "download the CSV and keep it safe": it steers away from long-lived access keys on human IAM users entirely, pushing federated access through **IAM Identity Center** instead (the point [6.1](../module-06.1-introduction-to-iam/README.md) lands on). Many accounts warn — or block outright — on creating a new access key for a console user. Worth treating that access-key step as something to skip by default, not a routine part of creating a user.
 
 ---
 
@@ -116,7 +116,7 @@ That role is now available to attach to any EC2 instance. Once attached, the ins
 - ✅ Attaching a policy to a group updates every member's effective permissions at once — no per-user repetition
 - ✅ A custom policy is the same JSON shape as a managed one, just scoped to fewer actions
 - ✅ A role only becomes useful once something (an EC2 instance, another account, a federated user) is set up to assume it
-- ⚠️ This demo's "create an access key for a human user" step reflects the older default — current AWS guidance favors IAM Identity Center for human access and reserves long-lived access keys for cases with no federation option, same conclusion 6.1 already reached
+- ⚠️ AWS guidance favors IAM Identity Center for human access and reserves long-lived access keys for cases with no federation option, same conclusion [6.1](../module-06.1-introduction-to-iam/README.md) reaches
 
 ---
 
