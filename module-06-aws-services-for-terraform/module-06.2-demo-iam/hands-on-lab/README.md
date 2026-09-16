@@ -1,6 +1,6 @@
 # Hands-On Lab: Demo IAM
 
-> Companion hands-on lab for [Module 6.2: Demo IAM](../README.md). This is the same user/group/policy/role exercise from that lesson, done for real in my own AWS account through the current IAM console — not the older console the course screenshots show.
+> Companion hands-on lab for [Module 6.2: Demo IAM](../README.md). This is the same user/group/policy/role exercise from that lesson, done for real in my own AWS account.
 
 ---
 
@@ -21,7 +21,7 @@ What I set up:
 
 ### 1. Create Lucy, then attach AdministratorAccess separately
 
-The current IAM console's "Create user" wizard doesn't let me pick a managed policy for a brand-new user inline the way the course does it in one pass — I name her, set a custom password, and that's it for step 1:
+The IAM console's "Create user" wizard doesn't let me pick a managed policy for a brand-new user inline — I name her, set a custom password, and that's it for step 1:
 
 ![Create user wizard: user name "lucy", console access checked, custom password entered](images/01-create-user-lucy-details.png)
 
@@ -29,11 +29,11 @@ Step 2 ("Set permissions") defaults to **Add user to group** with no group selec
 
 ![Lucy's Add permissions page: AdministratorAccess checked in the policy list](images/02-attach-administratoraccess-to-lucy.png)
 
-That leaves her with two policies — `AdministratorAccess` and the default `IAMUserChangePassword`, same combination the course notes describe:
+That leaves her with two policies — `AdministratorAccess` and the default `IAMUserChangePassword`:
 
 ![Lucy's Permissions policies tab showing AdministratorAccess and IAMUserChangePassword, both attached directly](images/03-lucy-two-policies-attached.png)
 
-I did **not** create an access key for her. Her user summary page flags `Access key 1: Create access key` as a link, not a fact — no key exists. This is [6.1's course-age gap](../../module-06.1-introduction-to-iam/README.md) showing up live: the console itself nudges away from long-lived credentials on a human user now ("As a best practice, avoid using long-term credentials like access keys").
+I did **not** create an access key for her. Her user summary page flags `Access key 1: Create access key` as a link, not a fact — no key exists. This lines up with what I noted in [6.1](../../module-06.1-introduction-to-iam/README.md): the console itself nudges away from long-lived credentials on a human user now ("As a best practice, avoid using long-term credentials like access keys").
 
 ### 2. Abdul, Lee, and the `project-dev` group
 
@@ -67,7 +67,7 @@ Named it `EC2-list-read`. Same List+Read access-level picks against the S3 servi
 
 ![Policies list filtered to "s3": s3-readonly-policy created, alongside the ec2 policy from earlier](images/11-custom-policies-created.png)
 
-Ticking access-level checkboxes instead of individual actions is faster than the course's action-by-action picker, but it's coarser — "all List actions" pulled in every `Describe*`/`List*`/`Get*`-shaped call EC2 has, not just the handful the course settles on. Worth knowing the tradeoff: quick and broad-within-List/Read, versus slow and exactly-scoped.
+Ticking access-level checkboxes instead of individual actions is fast, but coarser — "all List actions" pulled in every `Describe*`/`List*`/`Get*`-shaped call EC2 has, not just a hand-picked few. Worth knowing the tradeoff: quick and broad-within-List/Read, versus slow and exactly-scoped.
 
 ### 4. The role: EC2 → `s3-readonly-role`
 
@@ -96,17 +96,15 @@ That's the piece [6.1's role section](../../module-06.1-introduction-to-iam/READ
 
 ---
 
-## What This Confirms
+## What I Learned
 
-| | Course (older console) | What I actually saw |
-|---|---|---|
-| Attach a policy while creating a user | One wizard, pick the policy inline | Wizard only offers group membership inline; a direct policy attach is a separate trip to the user's own Permissions tab afterward |
-| Group permissions | Attach a policy while creating the group | Group is created empty; policies get attached from the group's own Permissions tab in a follow-up step |
-| Custom policy authoring | Pick individual actions one by one | Access-level checkboxes (`List`, `Read`, `Write`, …) let me grant a whole category in one click — faster, but coarser than picking exact actions |
-| Access keys for a human user | Downloaded as part of user creation | Console now treats "no access key" as the default and calls creating one out as something to actively opt into |
+- Attaching a policy while creating a user isn't offered inline — the permissions step only offers group membership; a direct policy attach is a separate trip to the user's own Permissions tab afterward.
+- A new group is created empty — policies get attached from the group's own Permissions tab in a follow-up step, not during creation.
+- Custom policy authoring can go through access-level checkboxes (`List`, `Read`, `Write`, …) instead of picking individual actions — faster, but coarser: "all List actions" grants the whole category, not just what I actually need.
+- Access keys for a human user aren't handed out by default anymore — the console treats "no access key" as the default state and creating one is something I have to actively opt into.
 
-**Why this happens:** the IAM console I'm on is a newer redesign than the one in the course recordings — step boundaries moved (permissions got split out of the creation wizard into the identity's own page), but the underlying objects are identical: a user still just holds attached policies, a group still just fans a policy out to its members, and a role still needs a trust policy plus a permissions policy, same as [6.1](../../module-06.1-introduction-to-iam/README.md) describes.
+**Why this happens:** step boundaries in the console have moved — permissions got split out of the creation wizard into the identity's own page — but the underlying objects are unchanged: a user still just holds attached policies, a group still just fans a policy out to its members, and a role still needs a trust policy plus a permissions policy, same as [6.1](../../module-06.1-introduction-to-iam/README.md) lays out.
 
-**What surprised me:** I expected "add a group during user creation" to also mean "attach its policies right there," the way the course video does it in one continuous flow. It doesn't — the group gets created empty, and permissions are a deliberate second step on the group object itself. Small thing, but it means "create a group" and "give it permissions" are two separate, revisitable actions in the current console, not one.
+**What surprised me:** I expected "add a group during user creation" to also mean "attach its policies right there," all in one continuous flow. It doesn't — the group gets created empty, and permissions are a deliberate second step on the group object itself. Small thing, but it means "create a group" and "give it permissions" are two separate, revisitable actions, not one.
 
 **Next up:** wiring this same user/group/policy/role shape with `aws_iam_user`, `aws_iam_group`, `aws_iam_policy`, and `aws_iam_role` resource blocks in Terraform, instead of clicking through the console.
