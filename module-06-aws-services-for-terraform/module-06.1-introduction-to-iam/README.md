@@ -98,15 +98,35 @@ Same JSON shape as a managed policy — `Effect`, `Action`, `Resource` — just 
 
 ---
 
-## Human Users: Federation Over Individual IAM Users
+## Attach a Policy Directly, or Assume a Role?
 
-For a team like Lucy, Max, Abdul, and Lee, what I'd actually set up isn't four individual IAM users with access keys — it's federation through **IAM Identity Center** (AWS's SSO service), giving each person temporary credentials instead of long-lived ones.
+Both routes land the *exact same* permissions on whoever ends up calling AWS — same JSON, same `Effect`/`Action`/`Resource`. Attaching a policy straight to a user (like `AdministratorAccess` on Lucy, above) and attaching that same policy to a role instead grant identical access. What differs is the **shape of the identity holding it**: a standing one with a permanent credential, or a temporary one you have to actively *become* for a session.
 
-AWS's own guidance is direct about this: require human users to access AWS through federation with an identity provider, using temporary credentials, and reserve IAM users for the specific cases federation doesn't cover — service accounts, break-glass access, and similar exceptions.
+**Attach directly to a user (or group), when:**
+- There's genuinely no mechanism available to assume a role instead — the caller isn't running on AWS compute (no EC2/Lambda instance profile to lean on) and isn't coming through a federated identity provider (no SAML/OIDC trust set up).
+- A legacy tool or third-party integration only speaks static access keys and has no support for temporary, assumed credentials at all.
+- A break-glass/emergency account that has to work even if SSO/federation itself is down — kept tightly locked down (MFA, rarely used, closely audited) as a genuine last resort, not a daily-driver identity.
 
-The reasoning is simple: a long-lived access key stays valid indefinitely until someone notices and rotates it. Temporary credentials from federation (or from a role) expire on their own, so a leaked one has a much smaller window to cause damage.
+**Assume a role, when:**
+- The caller is an AWS service acting on my behalf — an EC2 instance, a Lambda function. These get an *instance profile* or *execution role*: temporary credentials get injected and rotated automatically, and there's never a static secret sitting in a config file to leak. This is the EC2 → S3 example above.
+- It's cross-account access — instead of creating a brand-new IAM user in Account B for someone from Account A, Account B defines a role that trusts Account A, and the person assumes it. No new standing credential exists in Account B at all.
+- It's a human, and federation is available (IAM Identity Center, or a corporate identity provider) — the identity lives in the IdP, and AWS just maps it to a role, assumable for the length of that one session. So a team like Lucy, Max, Abdul, and Lee would go through Identity Center → an assumed role, not four standalone IAM users each holding a permanent access key.
+- A third-party SaaS tool needs to reach into my AWS account (monitoring, CI/CD, backups) — a cross-account role (with an external ID) is the standard secure pattern instead of handing it an access key.
 
-None of the underlying concepts change because of this — users, groups, roles, and policies all still work exactly as described above. What changes is *how* a person's identity gets provisioned in the first place: through Identity Center rather than as a standalone IAM user with an access key. The IAM role pattern for AWS services (EC2 → S3, above) is already the recommended approach either way — no gap there.
+**Why roles win by default:** the credentials a role hands out are temporary and expire on their own (commonly anywhere from an hour to twelve), so a leaked one has a bounded lifetime instead of staying valid until someone notices and rotates it. There's also nothing sitting at rest to leak in the first place — no access key living in a `.env` file or a CI secret store — because the credentials are minted fresh each time the role is assumed, and every assumption is logged, which makes "who did what, using which identity" far easier to trace than a shared static key.
+
+The one thing a role can't do is grant itself: something has to be *able* to assume it. Where that mechanism genuinely doesn't exist yet, a directly-attached policy on a user is still the correct call, not a shortcut — the goal isn't "never use a user," it's "don't reach for a permanent credential when a temporary one would do the same job."
+
+### What This Looks Like Day-to-Day
+
+Working through the console labs, the pattern I kept landing on was: each person gets **one baseline policy attached directly** — admin, read-only, whatever matches their day-to-day job — and if a specific task needs more than that, I create a role instead, with its own (often multiple) policies attached, and let the person assume it just for that task. The elevated permissions are only active while the role is assumed, and disappear again once the task's done.
+
+That's actually two separate decisions stacked on top of each other, and it's worth keeping them apart:
+
+1. **Is the baseline identity itself permanent or temporary?** A directly-attached policy on an IAM user is permanent — it's not a role, so it doesn't expire on its own. The fuller version of best practice (from the section above) would make even *this* baseline temporary, by putting the person through IAM Identity Center instead of a standalone IAM user — they'd sign in, get a session mapped to a role with that same baseline policy, and the whole thing expires when they sign out.
+2. **Do task-specific elevated permissions come from a role?** Yes, always — this is the part I already had right. Multiple policies bundled into a role, assumed only for the task, gone when the session ends.
+
+So "baseline direct policy + temporary role for extra tasks" is a real, reasonable pattern — plenty of teams run exactly this. It's just one step short of the fullest recommendation, which pushes the *baseline* itself to be session-based too, not only the elevated add-on.
 
 ---
 
@@ -119,7 +139,8 @@ IAM controls who — human or AWS service — can do what to which resource. I c
 - ✅ Policies (JSON) as the actual permission grant — managed policies (`AdministratorAccess`) vs. custom ones
 - ✅ Groups, for attaching one set of policies to many users at once
 - ✅ Roles, for giving an AWS *service* (not a person) temporary, assumable permissions
-- ✅ For human users, federation through IAM Identity Center is the recommended path — individual IAM users with access keys are for the exceptions federation doesn't cover
+- ✅ Direct-attach vs. assume-role isn't about the permission (same policy either way) — it's a permanent credential vs. a temporary one, and roles win whenever there's a mechanism available to assume one
+- ✅ In practice: one permanent baseline policy per person, plus a temporary role assumed only for tasks that need more — two separate decisions (is the baseline itself permanent or temporary, and do extras come from a role), not one
 
 ---
 
@@ -131,7 +152,8 @@ IAM controls who — human or AWS service — can do what to which resource. I c
 - ✅ Console access and programmatic access (access keys) are separate credential types
 - ✅ Policies (JSON: `Effect`/`Action`/`Resource`) are the actual grant — managed or custom
 - ✅ Groups share policies across multiple users; roles give services (like EC2) temporary, assumable permissions instead of long-lived keys
-- ⚠️ For people, federation through IAM Identity Center beats a standalone IAM user with an access key — IAM users are for service accounts and the specific cases federation can't cover
+- ⚠️ Direct-attach vs. assume-role = permanent credential vs. temporary one, not different permissions — prefer assuming a role (for services, cross-account, or federated humans) whenever the mechanism to assume one exists; fall back to a direct attach only when it genuinely doesn't
+- ⚠️ "Permanent baseline + temporary role for extras" is common and reasonable, but the baseline itself being a standing IAM user (not a federated session) is the one piece still short of the fullest recommendation
 
 ---
 
