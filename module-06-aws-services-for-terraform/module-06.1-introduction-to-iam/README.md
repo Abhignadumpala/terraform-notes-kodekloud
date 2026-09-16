@@ -98,16 +98,15 @@ Same JSON shape as a managed policy — `Effect`, `Action`, `Resource` — just 
 
 ---
 
-## 📌 What's Changed Since This Course Was Recorded
+## Human Users: Federation Over Individual IAM Users
 
-Checked this against the current AWS IAM docs while writing this note, since the course is a few years old and IAM guidance has shifted:
+For a team like Lucy, Max, Abdul, and Lee, what I'd actually set up isn't four individual IAM users with access keys — it's federation through **IAM Identity Center** (AWS's SSO service), giving each person temporary credentials instead of long-lived ones.
 
-- **Individual IAM users with long-term access keys — the pattern this whole lesson teaches — is no longer AWS's recommended default.** The current docs say it directly: *"IAM best practices recommend that you require human users to use federation with an identity provider to access AWS using temporary credentials instead of using IAM users with long-term credentials. We recommend that you only use IAM users for specific use cases not supported by federated users."* In practice, that means **IAM Identity Center** (AWS's SSO service) is now the recommended way to give people like Lucy, Max, Abdul, and Lee access — not creating an IAM user per person.
-- IAM users still exist and still work exactly as described above — they're just now positioned as the exception (service accounts, break-glass access, specific unsupported cases) rather than the default for every human.
-- The IAM role mechanism for AWS services (EC2 → S3 access) is unchanged and still the recommended pattern — that part of the lesson holds up as-is.
-- Access keys specifically: AWS's current guidance is to avoid creating them for a user at all when there's an alternative (a role, or federation), precisely because they're long-lived, unlike the temporary credentials a role hands out.
+AWS's own guidance is direct about this: require human users to access AWS through federation with an identity provider, using temporary credentials, and reserve IAM users for the specific cases federation doesn't cover — service accounts, break-glass access, and similar exceptions.
 
-Nothing here invalidates the *concepts* (users, groups, roles, policies) — those are all still accurate. What's changed is which of them AWS recommends reaching for first when the identity is a person rather than an application.
+The reasoning is simple: a long-lived access key stays valid indefinitely until someone notices and rotates it. Temporary credentials from federation (or from a role) expire on their own, so a leaked one has a much smaller window to cause damage.
+
+None of the underlying concepts change because of this — users, groups, roles, and policies all still work exactly as described above. What changes is *how* a person's identity gets provisioned in the first place: through Identity Center rather than as a standalone IAM user with an access key. The IAM role pattern for AWS services (EC2 → S3, above) is already the recommended approach either way — no gap there.
 
 ---
 
@@ -120,7 +119,7 @@ IAM controls who — human or AWS service — can do what to which resource. I c
 - ✅ Policies (JSON) as the actual permission grant — managed policies (`AdministratorAccess`) vs. custom ones
 - ✅ Groups, for attaching one set of policies to many users at once
 - ✅ Roles, for giving an AWS *service* (not a person) temporary, assumable permissions
-- ✅ What's changed since the course was recorded: AWS now recommends federation/IAM Identity Center over individual IAM users for people, keeping IAM users mainly for service accounts and edge cases
+- ✅ For human users, federation through IAM Identity Center is the recommended path — individual IAM users with access keys are for the exceptions federation doesn't cover
 
 ---
 
@@ -132,7 +131,7 @@ IAM controls who — human or AWS service — can do what to which resource. I c
 - ✅ Console access and programmatic access (access keys) are separate credential types
 - ✅ Policies (JSON: `Effect`/`Action`/`Resource`) are the actual grant — managed or custom
 - ✅ Groups share policies across multiple users; roles give services (like EC2) temporary, assumable permissions instead of long-lived keys
-- ⚠️ The course teaches "one IAM user per person" — current AWS best practice prefers federation/IAM Identity Center for people, saving IAM users for service accounts and specific exceptions
+- ⚠️ For people, federation through IAM Identity Center beats a standalone IAM user with an access key — IAM users are for service accounts and the specific cases federation can't cover
 
 ---
 
