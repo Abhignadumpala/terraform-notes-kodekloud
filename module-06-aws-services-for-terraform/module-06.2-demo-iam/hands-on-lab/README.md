@@ -6,14 +6,14 @@
 
 ## What I Built
 
-Same shape as the course demo, my own names where I diverged from it:
+What I set up:
 
 - **User `lucy`** — console access with a custom password, `AdministratorAccess` attached directly to her (no access key — more on why below).
-- **Group `project-dev`** (course calls this "Project Sapphire Users") — `AmazonEC2FullAccess` and `AmazonS3FullAccess` attached to the group, not to individual users.
+- **Group `project-dev`** — `AmazonEC2FullAccess` and `AmazonS3FullAccess` attached to the group, not to individual users.
 - **Users `abdul` and `lee`** — both just added to `project-dev`, no policies attached to either user directly.
-- **Custom policy `EC2-list-read`** (course: "EC2-List-Read") — `ec2:Describe*` / `ec2:Get*` / `ec2:List*` on all resources.
-- **Custom policy `s3-readonly-policy`** (course: "S3-Read-Only") — same shape, scoped to S3.
-- **Role `s3-readonly-role`** (course: "S3-Read-Only Role") — trusted entity `ec2.amazonaws.com`, `s3-readonly-policy` attached, so an EC2 instance can assume it and read S3 without a static key.
+- **Custom policy `EC2-list-read`** — `ec2:Describe*` / `ec2:Get*` / `ec2:List*` on all resources.
+- **Custom policy `s3-readonly-policy`** — same shape, scoped to S3.
+- **Role `s3-readonly-role`** — trusted entity `ec2.amazonaws.com`, `s3-readonly-policy` attached, so an EC2 instance can assume it and read S3 without a static key.
 
 ---
 
