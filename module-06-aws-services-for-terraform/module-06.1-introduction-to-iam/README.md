@@ -10,7 +10,7 @@ Every AWS lab in this repo so far has quietly assumed I already have permission 
 
 Module 6 is an AWS-services detour before I go further with Terraform: IAM first, then S3 and DynamoDB — the exact two services the state backend from Module 4 already leans on.
 
-![Course slide: a root account signs into AWS, which fans out to every service — EC2, DynamoDB, Elastic Block Store, S3, Route 53, VPC, plus every other AWS service](images/01-iam-overview-course-slide.png)
+![Slide: a root account signs into AWS, which fans out to every service — EC2, DynamoDB, Elastic Block Store, S3, Route 53, VPC, plus every other AWS service](images/01-iam-overview-course-slide.png)
 
 ---
 
