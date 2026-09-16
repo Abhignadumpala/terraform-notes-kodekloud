@@ -10,6 +10,8 @@ Every AWS lab in this repo so far has quietly assumed I already have permission 
 
 Module 6 is an AWS-services detour before I go further with Terraform: IAM first, then S3 and DynamoDB — the exact two services the state backend from Module 4 already leans on.
 
+![Course slide: a root account signs into AWS, which fans out to every service — EC2, DynamoDB, Elastic Block Store, S3, Route 53, VPC, plus every other AWS service](images/01-iam-overview-course-slide.png)
+
 ---
 
 ## Root Account vs IAM Users
@@ -19,6 +21,8 @@ Signing up for AWS with an email and password creates the **root account** — f
 AWS's own guidance is blunt about this: don't use the root account for daily work. Use it once, to create individual **IAM users**, then lock the root credentials away (MFA on it, credentials not stored anywhere routine) and do everything else as one of those IAM users instead.
 
 So a small team — Lucy, Max, Abdul, Lee — each gets their own IAM user, created from the root account, instead of everyone sharing root logins.
+
+![The AWS root account fans out to four individual IAM users: Lucy, Max, Abdul, and Lee](images/02-root-account-to-iam-users.jpg)
 
 ---
 
@@ -34,6 +38,8 @@ aws s3api create-bucket --bucket my-bucket --region us-east-1
 ```
 
 That command only works if whatever credentials the AWS CLI is using resolve to an IAM identity with `s3:CreateBucket` permission. Access keys authenticate the *request*; they don't grant console login, and console credentials don't work as CLI/API keys — the two are separate.
+
+![Lucy has two separate paths into AWS: a username + password into console.aws.com, and an access key ID + secret access key used by the AWS CLI](images/03-console-vs-programmatic-access.png)
 
 ---
 
@@ -58,9 +64,17 @@ AWS ships managed policies for common cases. `AdministratorAccess` is the broade
 
 `"Action": "*"` on `"Resource": "*"` — every action, every resource. That's what I'd attach to someone like Lucy if she's the project's technical lead and genuinely needs full account access. AWS also has narrower managed policies for specific jobs (billing, database admin, networking) — the point of a *managed* policy is I don't write these by hand, AWS maintains them.
 
+![Lucy attached to the AdministratorAccess IAM policy, shown as its JSON document: Version 2012-10-17, Effect Allow, Action *, Resource *](images/04-administratoraccess-policy-json.png)
+
 ### Groups, for Shared Permissions
 
-If Max, Abdul, and Lee all need the same EC2 and S3 access, I don't attach `AmazonEC2FullAccess` and `AmazonS3FullAccess` to each of them individually — I create a **group** (e.g. "Developer Group"), attach the policies to the group once, and add all three users to it. Anyone who needs something extra on top can still get a policy attached directly to their own user.
+If Max, Abdul, and Lee all need the same EC2 and S3 access, I don't attach `AmazonEC2FullAccess` and `AmazonS3FullAccess` to each of them individually —
+
+![Without a group: Max, Abdul, and Lee each attached separately to the same AmazonEC2FullAccess and AmazonS3FullAccess policies](images/05-users-with-individual-policies.png)
+
+— I create a **group** (e.g. "Developer Group"), attach the policies to the group once, and add all three users to it. Anyone who needs something extra on top can still get a policy attached directly to their own user.
+
+![With a group: Max, Abdul, and Lee inside a Developer Group box, which is attached once to AmazonEC2FullAccess and AmazonS3FullAccess, fanning out to EC2 and S3](images/06-developer-group-shared-policies.png)
 
 ---
 
@@ -71,6 +85,8 @@ Everything above is about human users. But an EC2 instance doesn't have an IAM u
 Concretely: create a role (e.g. "S3 Access Role"), attach `AmazonS3FullAccess` to it, and attach the role to the EC2 instance. The instance can now call S3 without ever holding a long-lived access key — it gets temporary credentials for as long as the role is attached.
 
 This same mechanism is behind cross-account access, and behind letting users from an external identity source (like an organization's Active Directory) get *temporary* AWS access without becoming full-blown IAM users.
+
+![Three kinds of principals — another AWS account, an application, and a corporate directory (AD/SAML) — all reaching the same set of AWS services (EC2, DynamoDB, EBS, S3, Route 53, VPC) through a role instead of a standing IAM user](images/07-role-principals-to-aws-services.png)
 
 ---
 
