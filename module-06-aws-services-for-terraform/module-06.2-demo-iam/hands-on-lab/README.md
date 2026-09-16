@@ -96,12 +96,10 @@ That's the piece [6.1's role section](../../module-06.1-introduction-to-iam/READ
 
 ---
 
-## What I Learned
+## Summary
 
-- Attaching a policy to a brand-new user isn't part of the creation wizard — the permissions step there only offers group membership. Attaching a policy directly is a separate trip to the user's own Permissions tab, after the user already exists.
-- A new group is created empty. Its policies get attached separately, from the group's own Permissions tab, after the group already exists — so "create a group" and "give it permissions" are two separate, revisitable actions, not one.
-- A custom policy can be built from access-level checkboxes (`List`, `Read`, `Write`, …) instead of picking individual actions one by one — faster, but coarser: ticking "List" grants the whole category, not just the specific actions I actually need.
-- A human user doesn't get an access key by default. Creating one is a separate, deliberate action, not something bundled into creating the user — and per [6.1](../../module-06.1-introduction-to-iam/README.md), that's the right default to lean into, not just a UI quirk.
-- A role needs two separate JSON documents: a trust policy (who can assume it) and a permissions policy (what it can do once assumed) — the console fills the trust policy in for me once I pick "EC2" as the trusted service, but the permissions policy is whatever I explicitly attach.
+- **User + policy:** create the user, then attach a policy to grant permissions — either directly to the user, or by adding the user to a group.
+- **Group + policy:** create the group, attach a policy to the group once, then add users to it. Permissions apply to every member automatically — no need to attach anything to each person separately.
+- **Role + policy:** create the role, pick the trusted entity (e.g. EC2), and attach a policy to it. Any instance of that trusted service can then assume the role and use whatever permissions the attached policy grants — no static credentials involved.
 
 **Next up:** wiring this same user/group/policy/role shape with `aws_iam_user`, `aws_iam_group`, `aws_iam_policy`, and `aws_iam_role` resource blocks in Terraform, instead of clicking through the console.
