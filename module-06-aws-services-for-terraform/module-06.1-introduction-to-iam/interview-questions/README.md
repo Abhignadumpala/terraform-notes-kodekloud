@@ -39,7 +39,14 @@ An EC2 instance isn't an IAM identity — it has no user of its own. Roles exist
 Cross-account access, federated/external identity access (e.g. via an org's Active Directory), and any service-to-service permission grant.
 
 **9. What's the difference between a policy and a role?**
-A policy is just a JSON document defining permissions — `Effect`/`Action`/`Resource`, nothing more. A role is an identity that can be *assumed* (by a user, a service, another account) and has one or more policies attached to it. The policy defines what's allowed; the role is what gets the temporary credentials and carries that policy around. A policy on its own grants nothing until it's attached to a user, group, or role.
+A policy is just a JSON document defining permissions — `Effect`/`Action`/`Resource`, nothing more. A role is an identity that can be *assumed* (by a user, a service, another account) and has one or more policies attached to it. The policy defines what's allowed; the role is what gets the temporary credentials and carries that policy around. A policy on its own grants nothing until it's attached to a user, group, or role — and the same policy can attach to a user directly or to a role, with identical resulting permissions either way.
+
+**9a. If a policy grants the same permissions either way, when do you attach it directly to a user vs. attach it to a role and assume that?**
+It comes down to whether the caller can actually assume a role at all, and whether a permanent credential is really needed:
+- **Direct attach to a user**, when there's no assume mechanism available — no AWS compute instance profile, no federated identity provider — such as a legacy tool that only supports static access keys, or a break-glass emergency account that must work even if SSO is down.
+- **Assume a role**, when one is available — an EC2 instance or Lambda function (via an instance/execution role, credentials auto-injected and auto-rotated), cross-account access (the target account defines a role that trusts the source account, instead of creating a new user), or a human via federation (IAM Identity Center / a corporate IdP maps the person to a role for that session).
+
+The reason roles are preferred whenever possible: their credentials are temporary and expire on their own, so a leaked one has a bounded window of usefulness. A user's access key has no such expiry — it's valid until someone notices and rotates or deletes it. Same permissions, very different blast radius if either one leaks.
 
 ---
 
@@ -53,3 +60,6 @@ Current AWS best practice says no — use federation/IAM Identity Center (SSO) f
 
 **12. Why did AWS move away from recommending long-term access keys for people?**
 Long-term keys don't expire on their own, so a leaked key stays valid indefinitely unless someone notices and rotates it. Temporary credentials (from federation or roles) expire automatically, shrinking the blast radius of a leak.
+
+**13. In practice, would you give every employee a permanent policy directly, or route everything through roles?**
+A common, reasonable pattern is both, for different purposes: attach one **permanent baseline policy** directly to each person, scoped to their day-to-day job (admin, read-only, developer, etc.), and use a **role** only for anything beyond that baseline — assumed just for the specific task, expiring once it's done. That's two separate decisions, not one: whether the baseline itself is permanent or temporary (a standing IAM user vs. a federated session through IAM Identity Center), and whether extra, task-specific permissions come from a role (yes, always). The fullest version of best practice makes *both* temporary — even the baseline comes from a federated session — but "permanent baseline + temporary role for extras" is still a real improvement over one person holding a single standing admin policy all the time.
