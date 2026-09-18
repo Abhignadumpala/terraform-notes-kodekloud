@@ -25,6 +25,7 @@ module-0<N>-<topic>/
 ```
 
 - `core-workflow/` and `terraform-cli-vs-cloud.md` at the repo root are standalone notes not tied to a single module number.
+- `terraform-projects/` at the repo root holds standalone, self-contained Terraform projects that aren't tied to a specific course lesson (e.g. interview-prep or portfolio-style labs) — flat kebab-case project folders, each with its own single README (concept + structure + how to run it, not split into a module-note/hands-on-lab pair) plus its own `.tf`/`.tfvars` files.
 - When adding a new sub-lesson (e.g. `03.9`), follow the existing sibling folders in that module for naming — check 1-2 neighboring folders first, since conventions have drifted (see below), and match the most recent one rather than the oldest.
 
 **Known inconsistencies — don't "fix" these unless asked, just be aware when navigating or adding new content:**
