@@ -4,9 +4,11 @@
 
 ---
 
-## What This Project Is
+## The Problem: One EC2 Resource, Different Sizes Per Environment
 
-A small, standalone Terraform project — not tied to a specific course lesson — built around one HCL feature that comes up constantly in real environments and in interviews: **conditional expressions**.
+Say I'm creating one EC2 instance with Terraform, and I want its size to depend on which environment it's going into — production should come up as `t2.medium`, dev should come up as `t2.micro`. How do I get one `aws_instance` block to do that, instead of maintaining two near-identical copies of the same resource?
+
+That's what a **conditional expression** — Terraform's ternary operator — is for:
 
 ```hcl
 condition ? true_val : false_val
