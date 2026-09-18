@@ -1,12 +1,12 @@
 # 📘 Module 6.4: AWS IAM with Terraform
 
-> Earlier I created an IAM user by hand, in the console ([6.2](../module-06.2-demo-iam/README.md)). Now let's try it with Terraform.
+> Earlier I learned how to create an IAM user by hand, in the console ([6.2](../module-06.2-demo-iam/README.md)), and from the CLI ([6.3](../module-06.3-programmatic-access/README.md)). Now let's do it with Terraform.
 
 ---
 
 ## Introduction
 
-A console click and a Terraform resource block both create the same thing: an IAM user. The difference is that once it's a resource block, it's version-controlled, repeatable, and part of the same `plan`/`apply` workflow as every other resource in this repo — no clicking required.
+A console click, a CLI command, and a Terraform resource block all create the same thing: an IAM user. The difference is that once it's a resource block, it's version-controlled, repeatable, and part of the same `plan`/`apply` workflow as every other resource in this repo — no clicking or one-off commands required.
 
 ---
 
