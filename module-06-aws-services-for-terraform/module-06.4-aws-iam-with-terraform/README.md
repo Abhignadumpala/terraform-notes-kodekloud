@@ -1,6 +1,6 @@
 # 📘 Module 6.4: AWS IAM with Terraform
 
-> Everything I did by hand in [6.2](../module-06.2-demo-iam/README.md) and from the CLI in [6.3](../module-06.3-programmatic-access/README.md) — creating an IAM user — now as a Terraform resource block.
+> Earlier I created an IAM user by hand — first in the console ([6.2](../module-06.2-demo-iam/README.md)), then from the CLI ([6.3](../module-06.3-programmatic-access/README.md)). Now let's try it with Terraform.
 
 ---
 
