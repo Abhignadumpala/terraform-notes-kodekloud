@@ -1,26 +1,141 @@
 # Conditional EC2 Sizing
 
-> One resource block, sized differently per environment: `t2.micro` for dev, `t2.medium` for prod — driven entirely by Terraform's conditional (ternary) expression.
+> The question every DevOps engineer runs into: one EC2 instance, but dev needs `t2.micro` and prod needs `t2.medium` — how do you get both from the same Terraform code?
 
 ---
 
-## The Problem: One EC2 Resource, Different Sizes Per Environment
+## ❓ Suppose You're Creating One EC2 Instance Using Terraform...
 
-Say I'm creating one EC2 instance with Terraform, and I want its size to depend on which environment it's going into — production should come up as `t2.medium`, dev should come up as `t2.micro`. How do I get one `aws_instance` block to do that, instead of maintaining two near-identical copies of the same resource?
+If it's production environment, it should create `t2.medium`. If it's dev, then `t2.micro`. How to do it?
 
-That's what a **conditional expression** — Terraform's ternary operator — is for:
+This is the question every DevOps engineer faces when managing multi-environment infrastructure.
+
+**The Real Problem:**
+
+One application, but it needs different compute power in different environments:
+→ Dev: small, cheap (`t2.micro`) — testing happens here, mistakes are expected
+→ Prod: powerful (`t2.medium`) — handles real traffic, needs CPU headroom
+
+**The Naive Solution (That Fails):**
+
+Copy-paste the same resource block twice:
 
 ```hcl
-condition ? true_val : false_val
+resource "aws_instance" "app_dev" {
+  instance_type = "t2.micro"
+  tags = { Name = "app-dev" }
+}
+
+resource "aws_instance" "app_prod" {
+  instance_type = "t2.medium"
+  tags = { Name = "app-prod" }
+}
 ```
 
-Here, that's:
+❌ Duplicated code
+❌ Twice the maintenance burden
+❌ Risk of drift (changes in one, forgotten in the other)
+❌ Not scalable (add staging? Duplicate again)
+
+**The Professional Solution: Terraform's Conditional (Ternary Operator)**
+
+Write ONE resource block that branches based on environment:
 
 ```hcl
-instance_type = var.environment == "prod" ? "t2.medium" : "t2.micro"
+variable "environment" {
+  type = string
+}
+
+resource "aws_instance" "app" {
+  instance_type = var.environment == "prod" ? "t2.medium" : "t2.micro"
+
+  tags = {
+    Name        = var.instance_name
+    Environment = var.environment
+  }
+}
 ```
 
-Pass `environment = "prod"` and the instance comes up as `t2.medium`. Pass anything else (`"dev"`, `"staging"`, …) and it comes up as `t2.micro`. Same resource block, same `.tf` files — the only thing that changes between environments is which `.tfvars` file I point at.
+Read it as: *If environment equals "prod", use t2.medium. Otherwise, use t2.micro.*
+
+**How It Works:**
+
+1. **Define the environment variable** (`variables.tf`)
+   ```hcl
+   variable "environment" {
+     description = "Environment name (dev or prod)"
+     type        = string
+   }
+   ```
+
+2. **Create environment-specific values** (`dev.tfvars`, `prod.tfvars`)
+   ```hcl
+   # dev.tfvars
+   environment   = "dev"
+   instance_name = "app-dev-instance"
+
+   # prod.tfvars
+   environment   = "prod"
+   instance_name = "app-prod-instance"
+   ```
+
+3. **Deploy with the right `.tfvars` file**
+   ```bash
+   # For Dev
+   terraform apply --var-file=dev.tfvars
+   # → Creates t2.micro instance
+
+   # For Prod
+   terraform apply --var-file=prod.tfvars
+   # → Creates t2.medium instance
+   ```
+
+**The Result:**
+
+✅ One `.tf` file for both environments
+✅ No code duplication
+✅ Easy to read, easy to scale (add staging? Just add a `.tfvars`)
+✅ Same logic, different outputs
+
+**The Architecture:**
+
+```
+variables.tf
+    ↓
+    └─→ var.environment
+
+dev.tfvars (environment = "dev")
+    ↓
+    └─→ Conditional: "dev" == "prod" ? t2.medium : t2.micro
+        ↓
+        Result: t2.micro ✓
+
+prod.tfvars (environment = "prod")
+    ↓
+    └─→ Conditional: "prod" == "prod" ? t2.medium : t2.micro
+        ↓
+        Result: t2.medium ✓
+```
+
+**Real AWS Output:**
+
+Dev environment:
+```
+instance_type = t2.micro
+tags = { Name = "app-dev-instance", Environment = "dev" }
+```
+
+Prod environment:
+```
+instance_type = t2.medium
+tags = { Name = "app-prod-instance", Environment = "prod" }
+```
+
+**Key Takeaway:**
+
+One codebase. Smart branching. Environment-specific values. No duplication. No drift.
+
+The conditional isn't just syntax — it's the foundation of scalable, maintainable infrastructure-as-code.
 
 ---
 
