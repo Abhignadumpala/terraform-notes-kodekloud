@@ -149,6 +149,16 @@ terraform apply --var-file=prod.tfvars
 
 This is the built-in fix for the gotcha above — each workspace gets its own state, so switching workspaces (not just `.tfvars`) is what actually gives dev and prod separate instances. `terraform.workspace` can also be read directly inside the code, as an alternative to `var.environment`.
 
+I ran this for real: `terraform workspace new dev` and `terraform workspace new prod` each create a brand new, empty state — Terraform says so outright ("Workspaces isolate their state, so if you run 'terraform plan' Terraform will not see any existing state for this configuration"). Selecting the `dev` workspace and applying `dev.tfvars` planned a plain `+ create`, not an update, even though a `prod`-sized instance already existed from the default workspace's state:
+
+![terraform workspace new dev and terraform workspace new prod, each confirming a fresh empty state, followed by terraform workspace select dev and apply --var-file=dev.tfvars planning a fresh create](images/08-workspace-new-dev-prod.png)
+
+![terraform apply --var-file=dev.tfvars completing inside workspace "dev": Plan 1 to add, Apply complete, instance_id = i-03182a0ad04ae154b, instance_type = t2.micro](images/09-workspace-dev-apply-complete.png)
+
+The AWS console confirms the isolation: the new `dev`-workspace instance and the instance already running from the default workspace both show up as separate, running instances at the same time — `app-dev-instance` (`t2.micro`) alongside `app-prod-instance` (`t2.medium`), neither one touching the other's state:
+
+![AWS EC2 console: app-dev-instance (i-03182a0ad04ae154b, t2.micro) and app-prod-instance (i-0f430f087eff9619d, t2.medium) both Running side by side](images/10-aws-console-dev-and-prod-side-by-side.png)
+
 **Option 2 — a reusable module, called from a separate root config per environment.** The resource logic (the `aws_instance` block, the conditional) moves into a **module** — a folder Terraform treats as reusable, parameterized code. Each environment then gets its own thin folder that calls that module with its own values and its own backend (its own state file, entirely separate from the other environment's):
 
 ```
