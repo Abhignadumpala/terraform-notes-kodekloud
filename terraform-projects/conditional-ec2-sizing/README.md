@@ -177,3 +177,59 @@ This is the pattern most real production setups reach for, because it separates 
 ## What This Confirms
 
 Same `ec2_instance.tf`, same conditional, two separate deployments: `dev.tfvars` produced `t2.micro`, and after destroying that and applying `prod.tfvars` fresh, the new instance came up as `t2.medium` — a completely new instance ID, `+ create` in the plan, no leftover state from dev. The branching logic lives once, in the resource block; which branch actually runs depends only on which `.tfvars` file — and which state — I point at.
+
+---
+
+**Quick Reference: Workspaces vs Modules**
+
+---
+
+## **WORKSPACES**
+**What:** Multiple state files for the SAME code
+```
+One main.tf
+├─ workspace "dev"   → dev.tfstate
+└─ workspace "prod"  → prod.tfstate
+```
+**Command:**
+```bash
+terraform workspace new dev
+terraform workspace select prod
+terraform apply
+```
+**Use when:** Quick env switching, simple projects
+**Downside:** All envs use identical resource names (confusing)
+
+---
+
+## **MODULES**
+**What:** Reusable code blocks (like functions)
+```
+modules/
+├─ ec2/main.tf
+├─ rds/main.tf
+└─ networking/main.tf
+
+root/main.tf (calls modules)
+```
+**Usage:**
+```hcl
+module "web_server" {
+  source = "./modules/ec2"
+  instance_type = var.instance_type
+}
+```
+**Use when:** Complex infra, code reuse, production
+**Benefit:** Clean, scalable, professional ✅
+
+---
+
+## **TL;DR**
+| | Workspaces | Modules |
+|---|---|---|
+| **Separates** | State files | Code |
+| **Purpose** | Multiple envs | Reusable code |
+| **Professional** | ❌ No | ✅ Yes |
+| **Learning curve** | Easy | Medium |
+
+**Bottom line:** Workspaces = quick switching. Modules = production-grade reusability.
