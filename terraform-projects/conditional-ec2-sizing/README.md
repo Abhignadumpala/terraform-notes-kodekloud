@@ -1,4 +1,4 @@
-# Conditional EC2 Sizing
+# Creating Different EC2 Instance Types for Dev and Prod Using a Single Terraform Resource Block?
 
 > The question every DevOps engineer runs into: one EC2 instance, but dev needs `t2.micro` and prod needs `t2.medium` — how do you get both from the same Terraform code?
 
