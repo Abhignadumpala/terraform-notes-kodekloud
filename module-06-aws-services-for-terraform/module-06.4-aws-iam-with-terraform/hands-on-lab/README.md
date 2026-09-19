@@ -9,6 +9,7 @@
 - `aws_iam_user`, named `priya` (not `lucy` — that name's already taken in this account from the console walkthrough in [6.2](../../module-06.2-demo-iam/README.md), and IAM usernames have to be unique per account)
 - `aws_iam_policy` — `AdminUsers`, the same `AdministratorAccess`-shaped JSON from [6.1](../../module-06.1-introduction-to-iam/README.md#assigning-permissions), via heredoc
 - `aws_iam_user_policy_attachment` — grants that policy to `priya`
+- A second `aws_iam_user`, named `raj`, plus his own `aws_iam_policy` (`S3ReadOnly`, custom JSON — `s3:GetObject`/`s3:ListBucket`) and `aws_iam_user_policy_attachment` — same three-resource shape as `priya`, just narrower permissions
 
 No hardcoded `access_key`/`secret_key` in `provider.tf` — credentials come from `aws configure`, per the [Best Practices](../README.md#best-practices-for-managing-credentials) section in the module note.
 
@@ -52,6 +53,49 @@ And `priya`'s own **Permissions** tab confirms the attachment actually took — 
 ```bash
 terraform destroy
 ```
+
+---
+
+## Second User: A Narrower Custom Policy
+
+Same three-resource pattern as `priya` (`aws_iam_user` → `aws_iam_policy` → `aws_iam_user_policy_attachment`), just with a smaller permission set — `raj` gets `s3:GetObject`/`s3:ListBucket` on `Resource: "*"` instead of `AdministratorAccess`:
+
+```hcl
+resource "aws_iam_policy" "s3ReadOnly" {
+  name   = "S3ReadOnly"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_user_policy_attachment" "raj-s3-readonly" {
+  user       = aws_iam_user.readonly-user.name
+  policy_arn = aws_iam_policy.s3ReadOnly.arn
+}
+```
+
+This is a hand-written policy, not AWS's own `AmazonS3ReadOnlyAccess` managed policy (that one covers a longer list of `s3:Get*`/`s3:List*`/`s3:Describe*` actions) — close enough for read-only access to objects and bucket listings, but worth knowing it's narrower than the AWS-managed equivalent if this were a real account.
+
+```bash
+terraform plan
+```
+
+With `priya`, her policy, and her attachment already applied, `plan` only picks up the three new resources for `raj`:
+
+```
+Plan: 3 to add, 0 to change, 0 to destroy.
+```
+
+`terraform apply` creates all three; `terraform output readonly_user_name` / `s3_readonly_policy_arn` confirm them afterward. Same shape as the least-privilege point from the [module note](../README.md#least-privilege-priya-starts-with-nothing) — `raj` never holds `AdministratorAccess` at any point, he starts and stays scoped to S3 read-only.
 
 ---
 
