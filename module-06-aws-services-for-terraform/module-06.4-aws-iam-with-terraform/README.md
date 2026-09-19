@@ -179,7 +179,7 @@ EOF
 
 ## Attaching the Policy to the User
 
-Creating the policy doesn't grant it to anyone by itself — it just exists as an object AWS knows about. Granting it needs an `aws_iam_user_policy_attachment`, which takes the username and the policy's ARN:
+Creating the policy doesn't grant it to anyone by itself — it just exists as an object AWS knows about. Granting it needs an [`aws_iam_user_policy_attachment`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_policy_attachment) — that Registry page is where to check its exact arguments any time this note isn't enough. It takes the username and the policy's ARN:
 
 ```hcl
 resource "aws_iam_user_policy_attachment" "priya-admin-access" {
