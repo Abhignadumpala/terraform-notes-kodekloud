@@ -108,4 +108,4 @@ Bucket policies work a lot like IAM policies, and can also grant cross-account a
 
 In the console (or a sandbox account), create a bucket with a name that violates one of the naming rules and confirm AWS rejects it. Then create a valid bucket, upload a small file, and try to fetch its object URL directly while the bucket is still private — confirm it 403s — before writing a bucket policy scoped to just that object's key and watching the same URL start working.
 
-Next up in Module 6: wiring S3 into Terraform itself — `aws_s3_bucket` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM users and policies.
+Next up in Module 6: [wiring S3 into Terraform itself](../module-06.6-s3-with-terraform/README.md) — `aws_s3_bucket` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM users and policies.
