@@ -85,13 +85,22 @@ Bucket policies work a lot like IAM policies, and can also grant cross-account a
 
 ## Summary
 
-This module covered:
+- ✅ S3 is object storage — whole files as objects, not filesystem blocks like EBS
+- ✅ Buckets hold objects; bucket names are DNS-compliant (lowercase, no underscores, 3–63 chars, no trailing hyphen) and, by default, globally unique — though an opt-in account regional namespace (since March 2026) can scope uniqueness to just my own account+region instead
+- ✅ "Folders" in the console are cosmetic — every object's key is flat, even one that looks like `pictures/cat.jpg`
+- ✅ An object = key + data + metadata (owner, size, last-modified, plus anything custom)
+- ✅ Private by default; bucket policies (JSON, bucket-wide) and ACLs (per-object) are the two access-control mechanisms — though ACLs are off by default on new buckets since 2023, bucket/IAM policies are the current recommended path
 
-- How data is organized into buckets and objects
-- Guidelines for naming and creating buckets
-- Access control mechanisms — bucket policies and ACLs (and that ACLs are now off by default on new buckets, with bucket/IAM policies as the current recommended path)
+---
 
-With this foundation, I'm ready for the more practical side — Terraform integration and hands-on labs for managing S3.
+## Key Takeaway
+
+**S3 stores flat objects in uniquely-named buckets, locked down to the account owner until a bucket policy (or IAM policy) says otherwise.**
+
+- ✅ Object storage, not block storage — files in, files out, no filesystem semantics
+- ✅ Bucket names live in a DNS namespace shared by every AWS customer by default — but since March 2026, an account regional namespace is available so a name only has to be unique to my own account
+- ⚠️ "Folders" are a UI illusion over flat, prefix-named keys
+- ⚠️ Default-private, and ACLs are increasingly a legacy path — bucket policies (and IAM policies on the caller) are the mechanism to reach for now
 
 ---
 
