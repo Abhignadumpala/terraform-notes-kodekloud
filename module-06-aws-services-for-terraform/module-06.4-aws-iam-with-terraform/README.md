@@ -12,18 +12,18 @@ A console click, a CLI command, and a Terraform resource block all create the sa
 
 ## Creating an IAM User Resource
 
-Terraform resource types are prefixed with the provider name — `aws_iam_user` is the IAM-user resource in the `aws` provider. It needs one required argument, `name`, and accepts optional ones like `tags`:
+Terraform resource types are prefixed with the provider name — `aws_iam_user` is the IAM-user resource in the `aws` provider. Its full list of arguments and attributes is on the [`aws_iam_user` resource page](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user) in the Terraform Registry — that's the source of truth for this resource, not this note. It needs one required argument, `name`, and accepts optional ones like `tags`:
 
 ```hcl
 resource "aws_iam_user" "admin-user" {
-  name = "Lucy"
+  name = "priya"
   tags = {
-    Description = "Technical Team Leader"
+    Description = "DevOps Engineer"
   }
 }
 ```
 
-`admin-user` here is the Terraform-local resource name (how I refer to this block elsewhere in the config) — it doesn't have to match `name = "Lucy"`, the actual IAM username AWS will see.
+`admin-user` here is the Terraform-local resource name (how I refer to this block elsewhere in the config) — it doesn't have to match `name = "priya"`, the actual IAM username AWS will see.
 
 ---
 
@@ -42,7 +42,7 @@ Running `terraform plan` right after `init`, with nothing else configured, usual
 
 ## Configuring the AWS Provider
 
-Both problems come from one missing thing: a `provider "aws"` block. At its simplest, it can take the region and credentials directly:
+Both problems come from one missing thing: a `provider "aws"` block. Its full configuration reference — every argument it accepts, including the credential-related ones — is on the [AWS Provider docs page](https://registry.terraform.io/providers/hashicorp/aws/latest/docs). At its simplest, it can take the region and credentials directly:
 
 ```hcl
 provider "aws" {
@@ -52,9 +52,9 @@ provider "aws" {
 }
 
 resource "aws_iam_user" "admin-user" {
-  name = "Lucy"
+  name = "priya"
   tags = {
-    Description = "Technical Team Leader"
+    Description = "DevOps Engineer"
   }
 }
 ```
@@ -77,10 +77,10 @@ Terraform will perform the following actions:
       + arn           = (known after apply)
       + force_destroy = false
       + id            = (known after apply)
-      + name          = "Lucy"
+      + name          = "priya"
       + path          = "/"
       + tags          = {
-          + "Description" = "Technical Team Leader"
+          + "Description" = "DevOps Engineer"
         }
       + unique_id     = (known after apply)
     }
@@ -100,7 +100,7 @@ Confirming with `yes` creates the IAM user exactly as planned.
 
 ## Best Practices for Managing Credentials
 
-The hardcoded `access_key`/`secret_key` above is the version to avoid. Two better options, both of which keep the secret out of the `.tf` file entirely:
+The hardcoded `access_key`/`secret_key` above is the version to avoid. The provider's [Authentication and Configuration guide](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#authentication-and-configuration) lists every supported way to supply credentials — these two are the two I'd actually reach for, both of which keep the secret out of the `.tf` file entirely:
 
 **AWS CLI configuration** — the same `aws configure` from [6.3](../module-06.3-programmatic-access/README.md#configuring-the-aws-cli), writing to `~/.aws/credentials`:
 
