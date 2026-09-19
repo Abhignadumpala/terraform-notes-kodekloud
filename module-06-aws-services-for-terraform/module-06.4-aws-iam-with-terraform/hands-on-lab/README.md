@@ -60,28 +60,7 @@ terraform destroy
 
 Same three-resource pattern as `priya` (`aws_iam_user` → `aws_iam_policy` → `aws_iam_user_policy_attachment`), just with a smaller permission set — `raj` gets `s3:GetObject`/`s3:ListBucket` on `Resource: "*"` instead of `AdministratorAccess`:
 
-```hcl
-resource "aws_iam_policy" "s3ReadOnly" {
-  name   = "S3ReadOnly"
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:ListBucket"],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_iam_user_policy_attachment" "raj-s3-readonly" {
-  user       = aws_iam_user.readonly-user.name
-  policy_arn = aws_iam_policy.s3ReadOnly.arn
-}
-```
+![iam_user.tf, iam_policy_attachment.tf and iam_policy.tf with the new raj / s3ReadOnly / raj-s3-readonly blocks highlighted, terminal running terraform plan](images/05-raj-user-and-s3readonly-policy-code.png)
 
 This is a hand-written policy, not AWS's own `AmazonS3ReadOnlyAccess` managed policy (that one covers a longer list of `s3:Get*`/`s3:List*`/`s3:Describe*` actions) — close enough for read-only access to objects and bucket listings, but worth knowing it's narrower than the AWS-managed equivalent if this were a real account.
 
@@ -89,13 +68,51 @@ This is a hand-written policy, not AWS's own `AmazonS3ReadOnlyAccess` managed po
 terraform plan
 ```
 
-With `priya`, her policy, and her attachment already applied, `plan` only picks up the three new resources for `raj`:
+With `priya`, her policy, and her attachment already applied, `plan` only picks up the three new resources for `raj` — the new policy document and the new user, both still `(known after apply)` for anything AWS assigns:
+
+![terraform plan output showing aws_iam_policy.s3ReadOnly and aws_iam_user.readonly-user both will be created, full JSON policy body visible](images/06-terraform-plan-raj-s3readonly-detail.png)
 
 ```
 Plan: 3 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + readonly_user_arn      = (known after apply)
+  + readonly_user_name     = "raj"
+  + s3_readonly_policy_arn = (known after apply)
 ```
 
-`terraform apply` creates all three; `terraform output readonly_user_name` / `s3_readonly_policy_arn` confirm them afterward. Same shape as the least-privilege point from the [module note](../README.md#least-privilege-priya-starts-with-nothing) — `raj` never holds `AdministratorAccess` at any point, he starts and stays scoped to S3 read-only.
+![terraform plan summary: 3 to add, 0 to change, 0 to destroy, plus the three new output values](images/07-terraform-plan-raj-summary.png)
+
+```bash
+terraform apply
+```
+
+```
+aws_iam_user.readonly-user: Creating...
+aws_iam_policy.s3ReadOnly: Creating...
+aws_iam_user.readonly-user: Creation complete after 1s [id=raj]
+aws_iam_policy.s3ReadOnly: Creation complete after 1s [id=arn:aws:iam::002823000983:policy/S3ReadOnly]
+aws_iam_user_policy_attachment.raj-s3-readonly: Creating...
+aws_iam_user_policy_attachment.raj-s3-readonly: Creation complete after 0s [id=raj-20260919215245165400000001]
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+readonly_user_arn      = "arn:aws:iam::002823000983:user/raj"
+readonly_user_name     = "raj"
+s3_readonly_policy_arn = "arn:aws:iam::002823000983:policy/S3ReadOnly"
+```
+
+![terraform apply prompting yes, then creating readonly-user, s3ReadOnly and the attachment, Apply complete: 3 added, 0 changed, 0 destroyed, with all seven outputs listed](images/08-terraform-apply-raj-complete.png)
+
+`priya`'s outputs (`policy_arn`, `user_arn`, `user_name`) show up in that same output block too — this `apply` only added to state, it never touched her.
+
+`raj`'s own **Permissions** tab confirms it — `S3ReadOnly`, Customer managed, attached directly, not through a group:
+
+![raj's IAM console page: Permissions policies (1), S3ReadOnly, Customer managed, Attached via Directly](images/09-aws-console-raj-s3readonly-attached.png)
+
+Same shape as the least-privilege point from the [module note](../README.md#least-privilege-priya-starts-with-nothing) — `raj` never holds `AdministratorAccess` at any point, he starts and stays scoped to S3 read-only.
 
 ---
 
