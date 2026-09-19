@@ -1,69 +1,61 @@
 # 📘 Module 6.5: Introduction to AWS S3
 
-> Every S3 backend I've used since [4.1](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) has quietly assumed a bucket exists and my credentials can write to it. This is the module that actually explains what's on the other end of that `backend "s3" { bucket = ... }` block.
+> Every S3 backend I've used since [4.1](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) has quietly assumed a bucket already exists. This module explains what's actually on the other end of that `backend "s3" { bucket = ... }` block.
 
 ---
 
 ## Introduction
 
-S3 (Simple Storage Service) is AWS's object storage service — built to hold an effectively unlimited number of files (documents, images, videos, Terraform state files, anything) reliably and at scale. It's **object storage**, not **block storage**: S3 stores whole files as opaque objects, it doesn't manage filesystem blocks the way an EC2 instance's root volume (EBS) does. That distinction is why S3 is the right fit for "store this file and give it back to me later" and the wrong fit for "be the disk an operating system boots from."
+S3 (Simple Storage Service) is AWS's storage service, built for storing basically unlimited files — documents, images, videos, anything — reliably and at scale. It's object storage, not block storage: S3 stores whole files as objects, which is different from block storage solutions that are more suitable for things like operating systems or databases.
 
-This is the third stop in Module 6, after [6.1](../module-06.1-introduction-to-iam/README.md) (IAM concepts), [6.2](../module-06.2-demo-iam/README.md) (IAM in the console), [6.3](../module-06.3-programmatic-access/README.md) (programmatic access), and [6.4](../module-06.4-aws-iam-with-terraform/README.md) (IAM in Terraform) — S3 is the other AWS service the state-backend notes have been leaning on this whole time.
+## Key Concepts
 
----
+Data in S3 is organized into containers called **buckets**. Each bucket can hold an unlimited number of objects, and every file I store is treated as a separate object — even when it looks like it's organized into folders, like `pictures/cat.jpg` or `videos/dog.mp4`.
 
-## Buckets and Objects
+### Bucket Fundamentals
 
-S3 organizes everything into **buckets** — top-level containers, one per use case or project. Inside a bucket, every file I upload is an **object**. That holds true even when the key *looks* like a folder path: `pictures/cat.jpg` and `videos/dog.mp4` are two flat objects with slash-containing names, not files inside real subdirectories. S3 has no actual folder hierarchy underneath — the console just renders keys with a common prefix as if they were nested, for convenience.
+When creating an S3 bucket, a few rules apply:
 
-![Table of five objects in the all-pets bucket — pets.json, dog.jpg, cat.mp4, pictures/cat.jpg, videos/dog.mp4 — each with its own https://all-pets.us-west-1.amazonaws.com/... address](images/01-s3-object-listing-table.jpg)
+- **Unique bucket name** — by default, unique across every AWS account worldwide, since AWS gives the bucket a global DNS name. (Since March 2026, AWS also offers an *account regional namespace*, where a name only has to be unique to my own account instead of the whole world — see the [official naming docs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html) for how to opt in.)
+- **DNS-compliant naming** — bucket names can't contain uppercase letters or underscores, and can't end with a dash. They must be between 3 and 63 characters.
+- **File upload limit** — each individual file uploaded to S3 can be up to 5 TB in size.
 
-### Bucket Naming Rules
+For the comprehensive list of bucket naming restrictions, see the [official AWS documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html).
 
-- **DNS-compliant**: lowercase letters, numbers, hyphens, and periods only — no uppercase, no underscores, must start and end with a letter or number.
-- **3 to 63 characters** long.
-- **Unique** — but *where* it has to be unique depends on which namespace I create it in (below).
+Once created, the bucket is reachable at its own DNS endpoint. For example, a bucket named `all-pets` in the US West (N. California) region is reachable at:
 
-Full rules (there are a few more edge cases — no IP-address-shaped names, no leading `xn--`, a handful of reserved prefixes/suffixes for AWS's own features) are in the [official bucket naming documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html), the source of truth for this.
+[https://all-pets.s3.us-west-1.amazonaws.com](https://all-pets.s3.us-west-1.amazonaws.com)
 
-### Two Namespaces: Shared Global vs. Account Regional
+Objects inside the bucket are accessed using that endpoint plus the object's key.
 
-A plain bucket create (`aws s3 mb`, or the default `aws_s3_bucket` in Terraform) lands in S3's **shared global namespace** — the name has to be unique across every AWS account in the same partition, forever, the same way a domain name does. This is why bucket names have historically needed random suffixes tacked on: someone else may have already taken the plain name I wanted, and there's no way to know except trying.
+![Table of five objects in the all-pets bucket, each with its own https://all-pets.us-west-1.amazonaws.com/... address](images/01-s3-object-listing-table.jpg)
 
-AWS also offers an **account regional namespace**: an opt-in way to create a bucket whose name only has to be unique *within my own account and region*, not across every AWS customer. The name has to follow a fixed shape — `{my-chosen-prefix}-{12-digit-account-id}-{region}-an` (e.g. `reports-111122223333-us-west-2-an`) — and the create-bucket call has to explicitly opt in (`aws s3api create-bucket --bucket ... --bucket-namespace account-regional`, or `x-amz-bucket-namespace: account-regional` at the API level). AWS recommends this path for new buckets specifically because a name I want is never unavailable due to another account having grabbed it first — full details in [Namespaces for general purpose buckets](https://docs.aws.amazon.com/AmazonS3/latest/userguide/gpbucketnamespaces.html).
+### Object Structure in S3
 
-### Accessing a Bucket by URL
+An object in S3 consists of:
 
-Once created, a bucket's virtual-hosted–style endpoint is `https://<bucket_name>.s3.<region>.amazonaws.com` — e.g. a bucket named `all-pets` in US West (N. California) is reachable at `https://all-pets.s3.us-west-1.amazonaws.com`. Objects inside it are addressed by appending the object's key: `https://all-pets.s3.us-west-1.amazonaws.com/dog.jpg`.
+- **Key** — the unique identifier or name of the file.
+- **Data** — the file content.
+- **Metadata** — additional information such as creation time, owner, and file size.
 
-### File Size
+![dog.jpg inside the all-pets bucket, shown as Key/Data plus Metadata: Owner=Lucy, Size=5MB, Last Modified](images/02-s3-object-metadata.jpg)
 
-A single object can be up to **5 TB**. What the slide doesn't mention: a single `PUT` request tops out at **5 GB** — anything bigger than that has to go through S3's **multipart upload** (splitting the file into parts, uploading them in parallel, then S3 reassembles them). The `aws s3 cp`/`aws s3 sync` CLI commands and most SDKs do this automatically once a file crosses that threshold; it only becomes something I'd think about directly if I were calling the raw `PutObject` API myself.
+### Access Control
 
----
+By default, AWS restricts access to a bucket and its objects so that only the bucket owner has access. AWS manages access through:
 
-## Object Structure
-
-Every S3 object is really three things bundled together:
-
-- **Key** — the object's unique name within the bucket (`dog.jpg`, or `pictures/cat.jpg`)
-- **Data** — the actual file content
-- **Metadata** — extra info AWS tracks automatically (owner, size, last-modified timestamp) plus anything custom I attach myself
-
-![dog.jpg inside the all-pets bucket, shown as Key=dog.jpg / Value=Data (the object data) plus Metadata: Owner=Lucy, Size=5MB, Last Modified=Jan 26 2020](images/02-s3-object-metadata.jpg)
-
----
-
-## Access Control
-
-New buckets and objects are **private by default** — only the bucket owner (the AWS account, really) can reach them. AWS gives two mechanisms to open that up deliberately:
-
-- **Bucket policies** — a JSON document attached to the whole bucket, same `Effect`/`Action`/`Resource`/`Principal` shape as an IAM policy. Scoped at the bucket (or bucket+prefix) level. This is the current recommended path for controlling access.
-- **Access Control Lists (ACLs)** — permissions attached to an individual object. New buckets have ACLs disabled by default (the "Bucket owner enforced" [Object Ownership](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html) setting) — ACLs only come into play for buckets created before that default existed, or a narrow set of cases like certain cross-account log-delivery setups that still require them.
+- **Bucket Policies** — permissions applied at the bucket level.
+- **Access Control Lists (ACLs)** — permissions applied to individual objects. New buckets have ACLs turned off by default (since April 2023) — AWS now recommends controlling access with bucket policies and IAM policies instead of ACLs.
 
 ![all-pets bucket containing dog.jpg, with a padlock on the object (ACLs) and a padlock on the whole bucket (Bucket Policies)](images/03-s3-access-control-acl-policy.jpg)
 
-### Example: A Bucket Policy Granting Read Access
+---
+
+## Bucket Policies in Practice
+
+Bucket policies are JSON documents that control access to my S3 buckets. They can grant or restrict permissions for IAM users, groups, or even external accounts.
+
+Here's an example policy that allows an IAM user named Lucy to retrieve all objects from a bucket called `all-pets`:
 
 ```json
 {
@@ -85,36 +77,26 @@ New buckets and objects are **private by default** — only the bucket owner (th
 }
 ```
 
-This grants IAM user Lucy (identified by her full ARN in `Principal`) `s3:GetObject` on every object in `all-pets` (`/*`). Same policy shape works for public access too — drop the `Principal` restriction to `"*"` — which is exactly why bucket policies need care: a wrong `Resource`/`Principal` combination can expose a bucket to the entire internet instead of one user.
+Bucket policies work a lot like IAM policies, and can also grant cross-account access or public access when needed.
 
-> ⚠️ Same warning as [6.1](../module-06.1-introduction-to-iam/README.md#assigning-permissions) — least privilege applies here too. Don't reach for public or account-wide access when a scoped `Principal`/`Resource` does the job.
+> ⚠️ Avoid exposing buckets publicly unless it's genuinely required. Improper bucket policy configurations can lead to unauthorized data access.
 
 ---
 
 ## Summary
 
-- ✅ S3 is object storage — whole files as objects, not filesystem blocks like EBS
-- ✅ Buckets hold objects; bucket names are DNS-compliant (lowercase, no underscores, 3–63 chars, no trailing hyphen) and, by default, globally unique — though an opt-in **account regional namespace** (since March 2026) can scope uniqueness to just my own account+region instead
-- ✅ "Folders" in the console are cosmetic — every object's key is flat, even one that looks like `pictures/cat.jpg`
-- ✅ Max object size is 5 TB; a single `PUT` is capped at 5 GB, past that it's multipart upload
-- ✅ An object = key + data + metadata (owner, size, last-modified, plus anything custom)
-- ✅ Private by default; bucket policies (JSON, bucket-wide) and ACLs (per-object) are the two access-control mechanisms — though ACLs are off by default on new buckets since 2023, bucket/IAM policies are the current recommended path
+This module covered:
 
----
+- How data is organized into buckets and objects
+- Guidelines for naming and creating buckets
+- Access control mechanisms — bucket policies and ACLs (and that ACLs are now off by default on new buckets, with bucket/IAM policies as the current recommended path)
 
-## Key Takeaway
-
-**S3 stores flat objects in uniquely-named buckets, locked down to the account owner until a bucket policy (or IAM policy) says otherwise.**
-
-- ✅ Object storage, not block storage — files in, files out, no filesystem semantics
-- ✅ Bucket names live in a DNS namespace shared by every AWS customer by default — but since March 2026, an account regional namespace is available so a name only has to be unique to my own account
-- ⚠️ "Folders" are a UI illusion over flat, prefix-named keys
-- ⚠️ Default-private, and ACLs are increasingly a legacy path — bucket policies (and IAM policies on the caller) are the mechanism to reach for now
+With this foundation, I'm ready for the more practical side — Terraform integration and hands-on labs for managing S3.
 
 ---
 
 ## Practice & Next Steps
 
-In the console (or a sandbox account), create a bucket with a name that violates one of the naming rules (uppercase letters, or a trailing hyphen) and confirm AWS rejects it outright. Then create a valid bucket, upload a small file, and try to fetch its object URL directly while the bucket is still private — confirm it 403s — before writing a bucket policy scoped to just that one object's key and watching the same URL start working.
+In the console (or a sandbox account), create a bucket with a name that violates one of the naming rules and confirm AWS rejects it. Then create a valid bucket, upload a small file, and try to fetch its object URL directly while the bucket is still private — confirm it 403s — before writing a bucket policy scoped to just that object's key and watching the same URL start working.
 
-Next up in Module 6: wiring S3 into Terraform itself — `aws_s3_bucket` and the policy/ACL resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM users and policies.
+Next up in Module 6: wiring S3 into Terraform itself — `aws_s3_bucket` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM users and policies.
