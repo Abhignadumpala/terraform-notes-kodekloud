@@ -12,3 +12,8 @@ output "unique_id" {
   description = "AWS-assigned unique ID for the IAM user"
   value       = aws_iam_user.admin-user.unique_id
 }
+
+output "policy_arn" {
+  description = "ARN of the AdminUsers policy"
+  value       = aws_iam_policy.adminUser.arn
+}

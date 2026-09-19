@@ -128,6 +128,107 @@ Either way, the `provider "aws" {}` block can end up empty, or with just non-sec
 
 ---
 
+## Least Privilege: Priya Starts With Nothing
+
+A freshly-created `aws_iam_user` has zero permissions — same as when I created a user by hand in [6.2](../module-06.2-demo-iam/README.md#creating-an-iam-user-lucy). The right way to grant access is incrementally: attach only the specific policy she actually needs, not more. Terraform models this as two separate concerns — a **policy** (the permission document) and an **attachment** (granting that policy to a specific user) — matching the policy/user split from [6.1](../module-06.1-introduction-to-iam/README.md#assigning-permissions).
+
+---
+
+## Writing the Policy Document
+
+Same JSON shape as the `AdministratorAccess` policy from [6.1](../module-06.1-introduction-to-iam/README.md#assigning-permissions) — `Effect`, `Action`, `Resource`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+---
+
+## The `aws_iam_policy` Resource
+
+The [`aws_iam_policy` resource page](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) lists one mandatory argument: `policy`, the JSON document itself, as a string. A **heredoc** (`<<EOF ... EOF`) embeds that multi-line JSON string directly in the `.tf` file, without needing an external file or `jsonencode()`:
+
+```hcl
+resource "aws_iam_policy" "adminUser" {
+  name   = "AdminUsers"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+```
+
+---
+
+## Attaching the Policy to the User
+
+Creating the policy doesn't grant it to anyone by itself — it just exists as an object AWS knows about. Granting it needs an `aws_iam_user_policy_attachment`, which takes the username and the policy's ARN:
+
+```hcl
+resource "aws_iam_user_policy_attachment" "priya-admin-access" {
+  user       = aws_iam_user.admin-user.name
+  policy_arn = aws_iam_policy.adminUser.arn
+}
+```
+
+`aws_iam_user.admin-user.name` and `aws_iam_policy.adminUser.arn` both reference other resources in this same config — Terraform reads that as a dependency and creates the user and the policy first, then the attachment, automatically.
+
+---
+
+## Deploying All Three Together
+
+```bash
+terraform plan
+terraform apply
+```
+
+```
+aws_iam_user.admin-user: Creating...
+aws_iam_policy.adminUser: Creating...
+aws_iam_user.admin-user: Creation complete after 0s [id=priya]
+aws_iam_policy.adminUser: Creation complete after 0s
+aws_iam_user_policy_attachment.priya-admin-access: Creating...
+aws_iam_user_policy_attachment.priya-admin-access: Creation complete after 0s
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+```
+
+If `priya` already exists from an earlier `apply` (just the user, no policy yet), adding the policy and attachment resources to the same config and running `apply` again only creates those two — Terraform leaves the already-applied user alone. That's the incremental, least-privilege workflow from the top of this section, done for real: start with a user that has nothing, then grant exactly what's needed, as its own separate `apply`.
+
+---
+
+## An Alternative: Reading the Policy From a File
+
+Instead of a heredoc, the policy document can live in its own file (e.g. `admin-policy.json`, alongside the `.tf` files) and get pulled in with the built-in `file()` function:
+
+```hcl
+resource "aws_iam_policy" "adminUser" {
+  name   = "AdminUsers"
+  policy = file("admin-policy.json")
+}
+```
+
+Same result either way — a heredoc keeps everything in one `.tf` file, a separate `.json` file keeps the policy document readable on its own and reusable across multiple resources if needed.
+
+---
+
 ## Summary
 
 - ✅ `aws_iam_user` is a resource block like any other — required `name`, optional `tags`
@@ -135,20 +236,23 @@ Either way, the `provider "aws" {}` block can end up empty, or with just non-sec
 - ✅ `arn`, `id`, `unique_id` show as `(known after apply)` in the plan — AWS assigns them at creation time
 - ✅ Hardcoding `access_key`/`secret_key` in the provider block works, but leaks the secret into version control if the file is ever committed
 - ✅ `aws configure` (writes `~/.aws/credentials`) or exported `AWS_*` environment variables both keep credentials out of the `.tf` files entirely
+- ✅ `aws_iam_policy` holds the permission document (JSON, via heredoc or `file()`); `aws_iam_user_policy_attachment` is the separate resource that actually grants it to a user
+- ✅ Referencing `aws_iam_user.admin-user.name` and `aws_iam_policy.adminUser.arn` from the attachment resource creates an automatic dependency — user and policy first, attachment after
 
 ---
 
 ## Key Takeaway
 
-**An IAM user is just another Terraform resource — the only new piece here is where the provider gets its region and credentials from, and hardcoding them is the one option to avoid.**
+**An IAM user is just another Terraform resource, and so is a policy — the only thing that actually grants access is the separate attachment resource linking the two together.**
 
 - ✅ Same `plan`/`apply` workflow as every other resource in this repo
 - ⚠️ `access_key`/`secret_key` in the provider block is a real secret sitting in plain text — use `aws configure` or environment variables instead, same as [6.3](../module-06.3-programmatic-access/README.md)
+- ✅ A user existing and a user having permissions are two different resources — creating `aws_iam_policy` alone grants nothing until it's attached
 
 ---
 
 ## Practice & Next Steps
 
-Configure credentials with `aws configure` (not hardcoded in `.tf`), then run `terraform apply` on the `aws_iam_user.admin-user` block above and confirm the user shows up in the IAM console. Try adding a second `aws_iam_user` resource for a different name and applying both together in one `plan`.
+Configure credentials with `aws configure` (not hardcoded in `.tf`), then run `terraform apply` on the `aws_iam_user.admin-user` block above and confirm the user shows up in the IAM console. Once that's applied, add the `aws_iam_policy` and `aws_iam_user_policy_attachment` blocks and `apply` again — confirm the plan only shows 2 to add, not 3, since the user is already there. Try writing a narrower policy than `AdministratorAccess` (e.g. the EC2 read-only JSON from [6.1](../module-06.1-introduction-to-iam/README.md#custom-policies)) and attaching that instead.
 
-Next up in Module 6: attaching IAM policies to this user through Terraform — `aws_iam_policy`, `aws_iam_user_policy_attachment`, and the managed-vs-custom policy distinction from [6.1](../module-06.1-introduction-to-iam/README.md#assigning-permissions), now as code.
+Next up in Module 6: Introduction to AWS S3 — the other AWS service the [4.1 purpose-of-state](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) notes have been leaning on this whole time.
