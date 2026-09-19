@@ -35,6 +35,33 @@ terraform apply -replace="aws_instance.app"
 
 There's a catch: `create_before_destroy` only decides the *order* Terraform creates/destroys in. It doesn't move traffic. For a standalone instance with nothing in front of it, "new instance up before old one's destroyed" doesn't help anyone reach it unless something else routes traffic to the new one — an ALB target group, an ASG, or a DNS record that gets updated. So this pattern is really only zero-downtime when the instance already sits behind something that can shift traffic; on its own it just avoids a window with *no* instance running.
 
-**1c. When would you skip all this and let the default in-place resize happen?**
+**1c. Concretely, when the new instance comes up, how does the ALB find out about it — is target group registration something you update manually?**
+
+No, it's Terraform-managed, not a console click. You attach the instance to the target group with `aws_lb_target_group_attachment`, referencing the instance's id:
+
+```hcl
+resource "aws_lb_target_group_attachment" "app" {
+  target_group_arn = aws_lb_target_group.app.arn
+  target_id        = aws_instance.app.id
+  port             = 80
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+```
+
+Because `target_id` points at `aws_instance.app.id`, replacing the instance forces this attachment to be replaced too — `target_id` has no update path, it's ForceNew on `aws_lb_target_group_attachment`. That replacement is automatic, driven by Terraform's dependency graph, not something anyone clicks through in the AWS console.
+
+The part that's easy to miss: `create_before_destroy` on the instance alone isn't enough. The attachment depends on the instance, so it needs `create_before_destroy = true` too — otherwise Terraform can't guarantee the new attachment gets created before the old attachment (and old instance) are torn down, and you either get a dependency error on `terraform apply` or a real gap where the ALB has no target at all.
+
+Even with `create_before_destroy` set correctly on both resources, two more things gate actual zero downtime — and neither one is something that flag handles:
+
+- **Health checks.** The ALB won't send traffic to the new target until it passes the target group's health check (interval × healthy threshold). So "new instance exists" and "new instance is receiving traffic" aren't the same moment — there's a short window in between where the new instance is up but idle.
+- **Connection draining** (`deregistration_delay` on the target group). When the old target is deregistered, the ALB keeps routing its *already in-flight* connections to it for that delay, so in-progress requests aren't cut off the instant Terraform tears the old instance down.
+
+In practice, wiring this by hand with a single `aws_instance` + `aws_lb_target_group_attachment` works, but it's fiddly to get exactly right — you have to remember `create_before_destroy` on every resource in the dependency chain. That's the real reason production setups usually don't do it this way: an Auto Scaling Group with a target group attached handles the health-check gating and connection draining for you as part of an instance refresh, instead of hand-propagating `create_before_destroy` across resources.
+
+**1d. When would you skip all this and let the default in-place resize happen?**
 
 Dev/test environments, or anywhere a short stop/start is acceptable and you don't care about a clean slate — it's simpler and faster than standing up replacement infrastructure just to change an instance size.
