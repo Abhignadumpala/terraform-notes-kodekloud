@@ -255,4 +255,4 @@ Same result either way — a heredoc keeps everything in one `.tf` file, a separ
 
 Configure credentials with `aws configure` (not hardcoded in `.tf`), then run `terraform apply` on the `aws_iam_user.admin-user` block above and confirm the user shows up in the IAM console. Once that's applied, add the `aws_iam_policy` and `aws_iam_user_policy_attachment` blocks and `apply` again — confirm the plan only shows 2 to add, not 3, since the user is already there. Try writing a narrower policy than `AdministratorAccess` (e.g. the EC2 read-only JSON from [6.1](../module-06.1-introduction-to-iam/README.md#custom-policies)) and attaching that instead.
 
-Next up in Module 6: Introduction to AWS S3 — the other AWS service the [4.1 purpose-of-state](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) notes have been leaning on this whole time.
+Next up in Module 6: [Introduction to AWS S3](../module-06.5-introduction-to-s3/README.md) — the other AWS service the [4.1 purpose-of-state](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) notes have been leaning on this whole time.
