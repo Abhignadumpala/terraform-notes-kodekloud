@@ -2,6 +2,7 @@
 # created by someone else - I'm creating them here only so this lab is
 # self-contained and can be applied on its own, per the hands-on-lab
 # convention in this repo.
+
 resource "aws_iam_user" "finance_analyst_1" {
   name = "meena"
   tags = {

@@ -4,6 +4,7 @@ data "aws_caller_identity" "current" {}
 # plain "finance-21092020" (the module note's literal example name) would
 # almost certainly already be taken. Appending my account ID guarantees
 # uniqueness without needing a random suffix.
+
 resource "aws_s3_bucket" "finance" {
   bucket = "finance-${data.aws_caller_identity.current.account_id}"
 
