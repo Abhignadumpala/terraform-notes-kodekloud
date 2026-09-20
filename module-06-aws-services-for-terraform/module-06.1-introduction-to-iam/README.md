@@ -4,6 +4,16 @@
 
 ---
 
+## Policy Types at a Glance
+
+Before getting into IAM concept by concept, here's the shape of the whole policy system in one diagram — I come back to every piece of this in detail further down, and again in the [interview questions](interview-questions/README.md#policies--permissions).
+
+![Diagram: AWS IAM Policies split into Identity-based Policies (attached to users, groups, or roles) and Resource-based Policies (attached to AWS resources like S3, an SQS queue, etc.) — identity-based policies further split into AWS Managed, Customer Managed, and Inline. Below that, a sample IAM policy JSON document with Version, Statement, Effect, Action, and Resource labeled, ending in "IAM policies define who can do what on which AWS resources"](images/00-policy-types-and-json-keywords-diagram.png)
+
+The two-way split (identity-based vs. resource-based) is covered in [Assigning Permissions](#assigning-permissions) and [Custom Policies](#custom-policies) below; the JSON keywords (`Version`/`Statement`/`Effect`/`Action`/`Resource`) show up in every policy example in this note.
+
+---
+
 ## Introduction
 
 Every AWS lab in this repo so far has quietly assumed I already have permission to create the EC2 instances, S3 buckets, and DynamoDB tables Terraform asks for. The [4.1 purpose-of-state](../../module-04-terraform-state/module-04.1-purpose-of-state/README.md) and [5.9 terraform block](../../module-05-working-with-terraform/module-05.9-the-terraform-block/README.md) notes both use an S3 backend without ever explaining *why* my AWS credentials are allowed to touch that bucket in the first place. That's the gap IAM (Identity and Access Management) fills — it's the system that decides who gets to do what to which AWS resource, and it's what my AWS provider is actually authenticating against every time I run `terraform plan`.
