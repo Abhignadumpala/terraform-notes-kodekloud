@@ -34,6 +34,15 @@ Bucket policies (a JSON document attached to the whole bucket, same `Effect`/`Ac
 **8. Can an IAM group be used as the `Principal` in a bucket policy?**
 No — bucket policies (and other resource-based policies) only accept individual users, roles, an AWS account, or an AWS service as a principal, never a group. This isn't theoretical — I hit it directly in the [hands-on lab](../hands-on-lab/README.md#4-the-bucket-policy): to grant a group's members access, the fix is to list each member's own ARN (e.g. via `data.aws_iam_group.*.users[*].arn`), not the group's ARN.
 
+**8a. What's the difference between an identity-based policy and a resource-based policy, and do both have to allow access before a request goes through?**
+An identity-based policy is attached to a principal (a user, group, or role) and defines what that principal can do. A resource-based policy — like an S3 bucket policy — is attached to a resource instead, and defines who can reach it.
+
+Whether both are required depends on whether the principal and the resource are in the *same* AWS account:
+- **Same account** (the normal case — and what both my labs actually do): either one alone is enough. AWS's own policy evaluation logic grants access if *either* the identity-based policy or the resource-based policy allows it — it's a union, not "both required." My [6.6 lab](../hands-on-lab/README.md#4-the-bucket-policy) is direct proof of this: `meena` has no identity-based policy at all — nothing attached to her directly — and the bucket policy alone is what grants her access, because she and the bucket are in the same account.
+- **Cross-account** (the principal's account is different from the resource's account): now both really are required — the identity-based policy in the requester's own account has to allow reaching out, *and* the resource-based policy in the resource's account has to explicitly allow that outside principal in.
+
+Worth noting as a contrast from [6.4](../../module-06.4-aws-iam-with-terraform/README.md): `raj`'s `S3ReadOnly` policy there is the mirror-image setup — identity-based only, no bucket policy involved at all — and it still worked, for the same reason: same account, either mechanism on its own is sufficient.
+
 ---
 
 ### Terraform Implementation
@@ -65,3 +74,17 @@ No — same least-privilege point as IAM. `"Action": "*"` is illustrative, grant
 
 **16. Where would you check whether a bucket policy actually took effect — on the IAM user's page, or the bucket's page?**
 The bucket's page. A bucket policy is a *resource-based* policy — it's attached to the bucket, not the user, so it won't show up on the IAM user's own Permissions tab (that tab only shows identity-based policies attached directly to them). Check the S3 console → the bucket → **Permissions** tab → **Bucket policy**.
+
+---
+
+The Difference
+
+Identity-Based Policy: Attached to WHO (user/group/role)
+
+"What can meena do?"
+Answer: "meena can perform s3:GetObject"
+
+Resource-Based Policy: Attached to WHAT (bucket/queue/topic)
+
+"Who can access this finance bucket?"
+Answer: "Only meena can access finance bucket"
