@@ -12,6 +12,23 @@ Before getting into IAM concept by concept, here's the shape of the whole policy
 
 The two-way split (identity-based vs. resource-based) is covered in [Assigning Permissions](#assigning-permissions) and [Custom Policies](#custom-policies) below; the JSON keywords (`Version`/`Statement`/`Effect`/`Action`/`Resource`) show up in every policy example in this note.
 
+> ⚠️ The diagram's sample JSON has `"Version": "2012-08-17"` — that's not a real value. IAM policies only accept exactly `"2008-10-17"` (the older version) or `"2012-10-17"` (the current one); anything else gets rejected if I actually try to save it. Every real example in this note uses `"2012-10-17"`.
+
+---
+
+## Role Types at a Glance
+
+Same idea, for roles — a role is a policy pair (who can assume it, and what it can do once assumed), attached to something that gets *assumed* rather than something permanent.
+
+![Diagram: AWS IAM Roles split into Service Roles (assumed by AWS services like EC2, Lambda, RDS) and Cross-Account Roles (access across AWS accounts) — Service Roles broken into EC2 Instance Role, Lambda Role, and Delegation Role examples. Below that, a Trust Policy (AssumeRole Policy) JSON side by side with a Permission Policy JSON, and a Key Components box: Trust Policy/Principal = who can assume the role, Permission Policy/Actions = what it can do, Resource = on which resources, Session Duration = how long the session lasts](images/00b-role-types-and-trust-policy-diagram.png)
+
+Two corrections against this one, same as the diagram above:
+
+- Same invalid `"Version": "2012-08-17"` in both JSON boxes — should be `"2012-10-17"`.
+- **"Delegation Role" is grouped under Service Roles, but it shouldn't be** — "assume role from account" describes a role assumed by *another AWS account*, which is the Cross-Account Roles pattern, not a service assuming a role on its own behalf. EC2 Instance Role and Lambda Role are correctly placed (a service literally assumes those); Delegation Role belongs on the other side of the diagram.
+
+The two-policy structure (a **trust policy** deciding who can assume the role, a **permission policy** deciding what it can do once assumed) is the same distinction covered in [IAM Roles — Permissions for AWS Services, Not People](#iam-roles--permissions-for-aws-services-not-people) below, and in the [Roles](interview-questions/README.md#roles) section of the interview questions.
+
 ---
 
 ## Introduction
