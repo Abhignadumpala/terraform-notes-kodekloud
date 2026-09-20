@@ -28,6 +28,26 @@ Managed policies (e.g. `AdministratorAccess`) are pre-built and maintained by AW
 **6. Why would you put users in an IAM group instead of attaching policies directly to each one?**
 So permission changes happen in one place — attach/update policies on the group once instead of on every user individually.
 
+**6a. What are the two types of IAM policies, and what's the difference?**
+- **Identity-based policies** — attached to an identity: a user, a group, or a role. They define what that identity can do.
+- **Resource-based policies** — attached directly to a resource instead of an identity (an S3 bucket policy, a Lambda function policy, an SQS queue policy, a KMS key policy, an IAM role's trust policy). They define who's allowed to reach that resource.
+
+Not every service supports resource-based policies — S3, Lambda, SQS, DynamoDB, and KMS do, but plenty of services don't. **EC2 is a common one that doesn't** — there's no such thing as an "EC2 instance policy" attached to the instance itself; access to EC2 is controlled entirely through identity-based policies on whoever's calling the API.
+
+**6b. What are the three types of identity-based policies?**
+- **AWS managed policies** — created and maintained by AWS itself (`AdministratorAccess`, `AmazonS3ReadOnlyAccess`, etc.). I can attach them, but I can't edit them.
+- **Customer managed policies** — policies I write and manage myself: standalone, reusable, attachable to multiple users/groups/roles. The `AdminUsers` and `S3ReadOnly` policies from [6.4](../../module-06.4-aws-iam-with-terraform/README.md) are both this type.
+- **Inline policies** — embedded directly into one specific user, group, or role. Not reusable, not attachable to anything else, and deleted automatically if that identity is deleted.
+
+**6c. What are the standard keywords in an IAM policy JSON document?**
+- `Version` — the policy language version, almost always `"2012-10-17"`
+- `Statement` — an array holding one or more individual permission statements
+- `Effect` — `Allow` or `Deny`
+- `Action` — which API call(s) the statement applies to, e.g. `s3:GetObject`
+- `Resource` — which resource(s) the statement applies to, by ARN
+
+Two more show up constantly once a policy gets more specific: `Principal` (who the statement applies to — required on resource-based policies, since there's no identity already attached the way there is on an identity-based policy) and `Condition` (extra constraints, like restricting by source IP or requiring MFA).
+
 ---
 
 ### Roles
