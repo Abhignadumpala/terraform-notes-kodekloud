@@ -63,7 +63,32 @@ Confirmed in the console — the bucket exists:
 
 ### 3. The IAM group and its member
 
-`iam_group.tf` back, `plan` showed `3 to add` — the group, the user, and the membership:
+`iam_group.tf` has three resource blocks, in this order:
+
+```hcl
+resource "aws_iam_user" "finance_analyst_1" {
+  name = "meena"
+  tags = {
+    Description = "Finance Analyst"
+  }
+}
+
+resource "aws_iam_group" "finance_analysts" {
+  name = "finance-analysts"
+}
+
+resource "aws_iam_group_membership" "finance_analysts" {
+  name  = "finance-analysts-membership"
+  group = aws_iam_group.finance_analysts.name
+  users = [aws_iam_user.finance_analyst_1.name]
+}
+```
+
+1. **`aws_iam_user`** creates the user `meena` — on her own, with no permissions and no group. Same idea as [6.4](../../module-06.4-aws-iam-with-terraform/README.md) — a user existing doesn't mean the user can do anything yet.
+2. **`aws_iam_group`** creates the group `finance-analysts` — also empty at this point, nobody's in it.
+3. **`aws_iam_group_membership`** is the resource that actually links the two — it takes the group's name and a list of usernames, and puts `meena` into `finance-analysts`. Without this third block, the user and the group would both exist but have nothing to do with each other.
+
+`plan` showed `3 to add` — the group, the user, and the membership:
 
 ![iam_group.tf open, terraform plan showing aws_iam_group.finance_analysts, aws_iam_group_membership.finance_analysts, and aws_iam_user.finance_analyst_1 will all be created, Plan: 3 to add](images/06-iam-group-code-and-plan.png)
 
