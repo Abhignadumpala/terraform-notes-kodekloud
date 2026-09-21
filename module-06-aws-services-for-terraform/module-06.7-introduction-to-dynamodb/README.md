@@ -16,8 +16,6 @@ DynamoDB organizes data as **key-value pairs and documents**, not rows and colum
 
 Each row in a DynamoDB table is called an **item**, and each item is made up of one or more **attributes** — the actual pieces of data describing it. In the car table, `manufacturer`, `model`, `year`, and `VIN` are all attributes on a single item.
 
-![Table listing car details: manufacturer, model, year, and VIN for Toyota, Honda, Dodge, and Ford vehicles](images/01-dynamodb-car-table-example.jpg)
-
 As JSON, a couple of those items would look like this:
 
 ```json

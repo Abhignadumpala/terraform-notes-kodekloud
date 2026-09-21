@@ -21,8 +21,6 @@ This is the hands-on follow-up to [6.7](../module-06.7-introduction-to-dynamodb/
 
 I name the table `employee_data`, and set the primary key (partition key) to `employee_id`, type **Number** — the same "one attribute that must be unique per item" idea from [6.7](../module-06.7-introduction-to-dynamodb/README.md#primary-keys).
 
-![The image shows the AWS Console interface for creating a DynamoDB table named "employee_data" with "employee_id" as the primary key](images/01-create-table-employee-data.jpg)
-
 > ⚠️ **What's changed since this course was recorded:** back then, "leave the other settings at their default" meant **Provisioned** capacity mode — I'd have had to type in read/write capacity units, and DynamoDB's Always Free tier (25 GB storage + 25 RCU + 25 WCU) would have covered a table this small at no cost. Today, the console's default is **On-Demand** capacity mode instead — AWS now recommends it for most workloads, and it needs no capacity planning at all. The tradeoff: [DynamoDB's Always Free tier only applies to Provisioned mode](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode.html) — an On-Demand table is billed per request from the very first read or write, even for a table this size. For a demo table with a handful of items the cost is a fraction of a cent, but it's worth knowing "leave it at default" no longer means "definitely free" the way it used to.
 
 After a few seconds the table's created and shows up in the left sidebar. The **Items** tab is where I go to see its contents — empty, at first.
@@ -52,17 +50,24 @@ I can add more items the same way. This one leaves `role` off entirely:
 }
 ```
 
-> 💡 Only the primary key is required on an item — every other attribute is optional, and different items don't need the same set of attributes. This is [6.7](../module-06.7-introduction-to-dynamodb/README.md#primary-keys)'s flexible-schema point, done for real: `abdul` simply has no `role` attribute, and DynamoDB doesn't complain.
+A third item, with `role` set this time:
 
-![The image shows an AWS DynamoDB console displaying an "employee_data" table with three entries, including employee IDs, ages, names, and roles](images/02-employee-data-three-items.jpg)
+```json
+{
+  "employee_id": 3,
+  "name": "lee",
+  "age": 29,
+  "role": "developer"
+}
+```
+
+> 💡 Only the primary key is required on an item — every other attribute is optional, and different items don't need the same set of attributes. This is [6.7](../module-06.7-introduction-to-dynamodb/README.md#primary-keys)'s flexible-schema point, done for real: `abdul` simply has no `role` attribute, and DynamoDB doesn't complain.
 
 ---
 
 ## Filtering Items
 
-To find specific items without scanning the whole table by eye, I apply a filter on an attribute — here, filtering `role` down to just `Developer`:
-
-![The image shows an AWS DynamoDB console displaying an "employee_data" table with entries filtered by the role "Developer"](images/03-filtered-by-role-developer.jpg)
+To find specific items without scanning the whole table by eye, I apply a filter on an attribute — here, filtering `role` down to just `developer`, so the table view collapses to just Lee's row.
 
 > ⚠️ Worth being precise about what this console filter actually does: it's a **filter expression**, applied *after* DynamoDB has already read the matching items — not a query that only reads `role = Developer` items off disk. For a table this small it's invisible, but on a large table, filtering post-read is why filtering on anything other than the primary key doesn't save on read cost the way an actual key-based query does. See the [official filter-expression docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.FilterExpression.html) if this comes up again once queries via Terraform-provisioned tables are in the picture.
 
@@ -73,14 +78,14 @@ To find specific items without scanning the whole table by eye, I apply a filter
 - ✅ DynamoDB lives under Services → Databases
 - ✅ Created `employee_data` with `employee_id` (Number) as the partition key
 - ✅ Added items with **Create Item** + **Append** for extra attributes — only the primary key is mandatory, confirmed by `abdul` having no `role`
-- ✅ Filtered the table down to items matching one attribute value
+- ✅ Filtered the table down to the one item matching an attribute value (`role = developer`)
 - ⚠️ Console default capacity mode is now On-Demand, not Provisioned — the Always Free tier (25 RCU/WCU) only covers Provisioned mode, so a default-settings table today is billed per-request from the start (negligible cost for a demo, but not literally free the way it used to be)
 
 ---
 
 ## Key Takeaway
 
-**Every concept from 6.7 has a console screen behind it: a table needs just a primary key to exist, an item needs just that key's value to be valid, and everything else is optional and addable ad hoc.**
+**Every concept from 6.7 plays out the same way in the console: a table needs just a primary key to exist, an item needs just that key's value to be valid, and everything else is optional and addable ad hoc.**
 
 - ✅ `employee_id` alone was enough to create the table — no schema for `name`/`age`/`role` had to be declared up front
 - ✅ Items in the same table can have different attributes, same as the mixed VIN/car example in 6.7
