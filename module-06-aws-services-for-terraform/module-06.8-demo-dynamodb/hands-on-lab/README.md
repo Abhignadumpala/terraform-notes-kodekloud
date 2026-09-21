@@ -75,6 +75,34 @@ Selecting the result row opens an **Actions** menu with CSV export options — *
 
 > 💡 **Edit item**, **Duplicate item**, and **Delete items** are all grayed out here — because the projection is scoped to just the `role` attribute, the console doesn't have the full item (its partition key included) loaded to act on. Switching the projection back to **All attributes** before trying to edit or delete a row is the fix, next time this comes up.
 
+### 5. Querying with PartiQL
+
+DynamoDB also has a SQL-compatible query language, **PartiQL** — a `PartiQL editor` tab sits right next to `Explore items`, and it takes actual `SELECT` statements instead of the scan/query/filter form.
+
+**No `WHERE` at all** — everything in the table, both items:
+
+![PartiQL editor: SELECT * FROM employee_data, Items returned (2) — lee/developer/29 and lucy/team lead/42](images/12-partiql-select-all-scan.png)
+
+**`WHERE` on the partition key** — an equality condition on `employee_id`:
+
+![PartiQL editor: SELECT * FROM employee_data WHERE employee_id = 1, Items returned (1) — lucy/team lead/42](images/13-partiql-select-where-employee-id-query.png)
+
+**`WHERE` on a non-key attribute** — `role`, not `employee_id`:
+
+![PartiQL editor: SELECT * FROM employee_data WHERE role = 'developer', Items returned (1) — lee/developer/29](images/14-partiql-select-where-role-scan.png)
+
+> ⚠️ These last two queries *look* identical in shape — `SELECT * ... WHERE <attribute> = <value>` — but they run completely differently under the hood. [AWS's own PartiQL docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.select.html) are explicit about this: a `SELECT` becomes a **Query** only when the `WHERE` clause has an equality (or `IN`) condition on the partition key; anything else — including `WHERE role = 'developer'` here — falls back to a full **Scan**, reading every item and filtering afterward, exactly like the console filter from step 4. PartiQL's `SELECT` syntax hides that distinction; nothing about the query text warns me which one I'm about to run.
+
+A projection — just two columns, no `*`:
+
+![PartiQL editor: SELECT name, age FROM employee_data, Items returned (2) — age/name columns only, 29/lee and 42/lucy](images/15-partiql-select-name-age-projection.png)
+
+And a range condition on a non-key attribute, `age`:
+
+![PartiQL editor: SELECT * FROM employee_data WHERE age > 30, Items returned (1) — lucy/team lead/42](images/16-partiql-select-where-age-gt-30-scan.png)
+
+> 💡 `age > 30` is also a Scan, same reasoning as the `role` query above — `age` isn't the partition key, so there's no pruning to do; DynamoDB has to read every item and check the condition on each one.
+
 ---
 
 ## Summary
@@ -83,5 +111,6 @@ Selecting the result row opens an **Actions** menu with CSV export options — *
 - **Items:** `employee_id` is the only mandatory attribute; `name`/`age`/`role` were all added after the fact, one attribute at a time.
 - **Filtering:** a console filter is a scan-then-drop, not a targeted read — the result banner's "Items scanned" vs. "Items returned" makes that explicit.
 - **Export:** a filtered/projected result set can be pulled out as CSV directly from the Actions menu.
+- **PartiQL:** same `SELECT ... WHERE` syntax either turns into an efficient partition-key **Query** or a read-everything **Scan**, entirely depending on which attribute is in the `WHERE` clause — the query text alone doesn't show which one it'll be.
 
 **Next up:** wiring this same table with `aws_dynamodb_table` in Terraform, instead of clicking through the console.

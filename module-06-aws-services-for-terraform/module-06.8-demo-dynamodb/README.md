@@ -63,12 +63,29 @@ To find specific items without scanning the whole table by eye, I apply a filter
 
 ---
 
+## Querying with PartiQL
+
+DynamoDB also has **PartiQL** — a SQL-compatible query language, in its own **PartiQL editor** tab. I ran a few `SELECT` statements against `employee_data` (see the [hands-on lab](hands-on-lab/README.md#5-querying-with-partiql) for all five, with screenshots):
+
+```sql
+SELECT * FROM employee_data                              -- both items
+SELECT * FROM employee_data WHERE employee_id = 1        -- just lucy
+SELECT * FROM employee_data WHERE role = 'developer'      -- just lee
+SELECT name, age FROM employee_data                       -- projection, both items
+SELECT * FROM employee_data WHERE age > 30                -- just lucy
+```
+
+> ⚠️ These all look like plain SQL, but two of them — `WHERE employee_id = 1` and the other three — run completely differently underneath. Per [AWS's own PartiQL docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.select.html): a `SELECT` only becomes an efficient **Query** when the `WHERE` clause has an equality (or `IN`) condition on the partition key. Every other `WHERE` — `role = 'developer'`, `age > 30`, or no `WHERE` at all — falls back to a full **Scan**, same cost profile as the console filter above. The SQL syntax gives no visual hint which one a given statement will trigger; only knowing which attribute is the partition key does.
+
+---
+
 ## Summary
 
 - ✅ DynamoDB lives under Services → Databases
 - ✅ Created `employee_data` with `employee_id` (Number) as the partition key
 - ✅ Added two items with **Create Item** + **Append** for extra attributes — only the primary key is mandatory (neither of mine actually left an attribute off, but nothing requires them to match)
 - ✅ Filtered the table down to the one item matching an attribute value (`role = developer`) — confirmed as a scan-then-drop, not a targeted read, from the "Items scanned" vs. "Items returned" counts
+- ✅ Queried the same table with PartiQL's SQL-like `SELECT` — partition-key equality runs as a **Query**, everything else (including a non-key `WHERE`) runs as a **Scan**
 - ⚠️ Console default capacity mode is now On-Demand, not Provisioned — the Always Free tier (25 RCU/WCU) only covers Provisioned mode, so a default-settings table today is billed per-request from the start (negligible cost for a demo, but not literally free the way it used to be)
 
 ---
@@ -81,11 +98,12 @@ To find specific items without scanning the whole table by eye, I apply a filter
 - ✅ Items in the same table *can* have different attributes — mine happened not to, but nothing enforces uniformity
 - ⚠️ "Default settings" today means On-Demand billing, not the Provisioned + Always-Free-tier default this course was recorded against
 - ⚠️ A console filter costs the same read as scanning the whole table — it just hides the non-matching rows afterward
+- ⚠️ PartiQL's `SELECT ... WHERE` looks identical whether it's cheap or expensive — only a `WHERE` on the partition key gets the cheap path
 
 ---
 
 ## Practice & Next Steps
 
-Run the [hands-on lab](hands-on-lab/README.md): create this same `employee_data` table, add a couple of items, and this time deliberately leave an attribute off one of them to actually see the flexible-schema point instead of just reading about it. Then filter on more than one attribute at once, and check the table's **Capacity mode** setting.
+Run the [hands-on lab](hands-on-lab/README.md): create this same `employee_data` table, add a couple of items, and this time deliberately leave an attribute off one of them to actually see the flexible-schema point instead of just reading about it. Then filter on more than one attribute at once, check the table's **Capacity mode** setting, and try a PartiQL `SELECT` with an `IN` condition on `employee_id` — confirm it still runs as a Query, not a Scan, the same as the plain equality version.
 
 Next up in Module 6: wiring DynamoDB into Terraform — `aws_dynamodb_table` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM and [6.6](../module-06.6-s3-with-terraform/README.md) did for S3.
