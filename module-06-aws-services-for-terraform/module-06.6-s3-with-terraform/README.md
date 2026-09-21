@@ -139,4 +139,4 @@ EOF
 
 Run the [hands-on lab](hands-on-lab/README.md): create the bucket, upload a file, and confirm the bucket policy actually took by checking the bucket's **Permissions** tab in the console. Then try scoping the policy's `Action` down from `"*"` to just `["s3:GetObject", "s3:ListBucket"]` and re-apply — confirm the plan shows the policy updating in place, not the bucket being replaced.
 
-Next up in Module 6: Introduction to DynamoDB.
+Next up in Module 6: [Introduction to DynamoDB](../module-06.7-introduction-to-dynamodb/README.md).
