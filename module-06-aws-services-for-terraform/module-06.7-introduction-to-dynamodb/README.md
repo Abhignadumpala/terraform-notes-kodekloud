@@ -72,4 +72,4 @@ DynamoDB actually supports two shapes of primary key, though this intro only nee
 
 In the console (or a sandbox account), create a table like the car example with VIN as the partition key, add a couple of items with different attributes on each, and confirm DynamoDB doesn't complain about the mismatched shape. Then try adding an item without the primary key attribute and confirm it's rejected.
 
-Next up in Module 6: wiring DynamoDB into Terraform itself, the same way [6.6](../module-06.6-s3-with-terraform/README.md) did for S3.
+Next up in Module 6: [a hands-on demo](../module-06.8-demo-dynamodb/README.md), creating and using this same kind of table by hand in the console — then wiring DynamoDB into Terraform itself, the same way [6.6](../module-06.6-s3-with-terraform/README.md) did for S3.
