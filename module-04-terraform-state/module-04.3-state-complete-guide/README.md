@@ -200,6 +200,8 @@ This section used to stop at "re-run `terraform apply` to fix it" — that's onl
 
 ## **7️⃣ Backends**
 
+> 📌 Full standalone treatment now in **[Module 7: Remote State](../../module-07-remote-state/)** — S3 backend setup/security/locking in [7.1](../../module-07-remote-state/module-07.1-s3-remote-backend-and-locking/README.md), plus a new topic not covered here: sharing state across separate stacks with `terraform_remote_state`, in [7.2](../../module-07-remote-state/module-07.2-cross-stack-state-sharing/README.md).
+
 ### **What is Backend?**
 
 ```
