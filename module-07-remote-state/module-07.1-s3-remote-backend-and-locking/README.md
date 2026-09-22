@@ -1,6 +1,6 @@
 # 📘 Module 7.1: S3 Remote Backends and Native Locking
 
-> [4.2](../../module-04-terraform-state/module-04.2-terraform-state-considerations/README.md) first covered remote backends, back when Module 4 was working through state in general. This is that topic's own home now — same core content, re-verified against the current docs, with the gaps that showed up since then filled in.
+> [4.2](../../module-04-terraform-state/module-04.2-terraform-state-considerations/README.md) first covered remote backends, back when Module 4 was working through state in general. This is that topic's own home now — the original course lesson's content, re-verified against the current docs, with the gaps that showed up since then filled in.
 
 ---
 
@@ -34,6 +34,10 @@ terraform {
 7. **Run `terraform init`** — it sets up the backend and, if local state already exists, offers to migrate it over.
 
 `use_lockfile = true` is the entire native-locking setup — no DynamoDB table, no separate resource.
+
+> 📌 **This is the same workflow the original course lesson (Remote Backends with S3) teaches — with two things updated.** The lesson's own example uses `dynamodb_table = "state-locking"` for locking (requiring a pre-created DynamoDB table with a hash key literally named `lockid`) and pins `hashicorp/aws v3.7.0` — both were current when it was recorded, neither is anymore. The steps above already reflect the update: `use_lockfile` instead of a DynamoDB table, current provider versions. See the [hands-on lab](hands-on-lab/README.md) for this exact migration run for real — same "local state → add a backend block → `terraform init` migrates it" flow the lesson walks through, just against a real EC2 instance instead of the lesson's `local_file` "We love pets!" example, and the actual `terraform init -migrate-state` prompt as it looks on a current Terraform version.
+
+> 💡 **File organization**, per the same lesson: keep the `backend` block in its own file (`terraform.tf`), separate from the resources it stores state for (`main.tf`). Nothing forces this, but it's easier to find the one block that decides *where all of this state lives* when it isn't buried in the same file as the resources themselves — the hands-on lab follows this split.
 
 ---
 
@@ -69,6 +73,7 @@ Both mechanisms can run at the same time during the migration, which gives a saf
 - ⚠️ Native S3 locking: experimental in 1.10, GA since **1.11** — build against 1.11+
 - ⚠️ The lock file is `<key>.tflock`, per current docs — but real-world behavior has drifted from that on at least one older CLI version; verify against a current one rather than trusting either source blindly
 - ✅ Migrating off DynamoDB: upgrade, add `use_lockfile`, test, reinit, confirm, remove the old parameter, delete the table
+- ✅ The original course lesson's `dynamodb_table` + `local_file` example is outdated on two counts — locking mechanism and provider version — both corrected here and re-run for real in the [hands-on lab](hands-on-lab/README.md)
 
 ---
 
@@ -83,4 +88,4 @@ Both mechanisms can run at the same time during the migration, which gives a saf
 
 ## Practice & Next Steps
 
-Set up an S3 backend for a small project, confirm the lock file's actual name in the bucket after one `apply`, and compare it against what's documented here. Then move to [7.2](../module-07.2-cross-stack-state-sharing/README.md): splitting infrastructure across more than one state file, and reading one stack's outputs from another with `terraform_remote_state`.
+Run the [hands-on lab](hands-on-lab/README.md): start a small project on local state, add a `terraform.tf` backend block, and watch `terraform init -migrate-state` move it to S3 for real — then confirm the lock file's actual name in the bucket after one `apply`. Then move to [7.2](../module-07.2-cross-stack-state-sharing/README.md): splitting infrastructure across more than one state file, and reading one stack's outputs from another with `terraform_remote_state`.
