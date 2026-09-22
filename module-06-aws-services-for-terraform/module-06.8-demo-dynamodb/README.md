@@ -153,4 +153,4 @@ And a range condition on a non-key attribute, `age`:
 
 Create this same `employee_data` table, add a couple of items, and this time deliberately leave an attribute off one of them to actually see the flexible-schema point instead of just reading about it. Then filter on more than one attribute at once, and try a PartiQL `SELECT` with an `IN` condition on `employee_id` — confirm it still runs as a Query, not a Scan, the same as the plain equality version.
 
-Next up in Module 6: wiring DynamoDB into Terraform — `aws_dynamodb_table` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM and [6.6](../module-06.6-s3-with-terraform/README.md) did for S3.
+Next up in Module 6: [wiring DynamoDB into Terraform](../module-06.9-dynamodb-with-terraform/README.md) — `aws_dynamodb_table` and the resources that go with it, the same way [6.4](../module-06.4-aws-iam-with-terraform/README.md) did for IAM and [6.6](../module-06.6-s3-with-terraform/README.md) did for S3.
