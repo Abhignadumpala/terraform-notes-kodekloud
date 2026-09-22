@@ -77,6 +77,8 @@
 
 ## **3️⃣ State Commands**
 
+> 📌 Full standalone treatment, re-verified against a current Terraform version (and a genuinely different `state show` output than what's below — the AWS provider split `acl`/`versioning` off `aws_s3_bucket` since this was written), now in **[Module 7.3: Terraform State Commands](../../module-07-remote-state/module-07.3-terraform-state-commands/README.md)**.
+
 | Command | Purpose | Example | Use Case |
 |---------|---------|---------|----------|
 | **list** | See all resources in state | `terraform state list` | Quick inventory |

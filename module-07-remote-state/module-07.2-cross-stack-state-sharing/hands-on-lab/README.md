@@ -140,4 +140,4 @@ cd bootstrap && terraform destroy -auto-approve    # the bucket itself
 - **Verified two ways:** Terraform's own `vpc_id_from_remote_state` output, and an independent `aws ec2 describe-instances` call confirming the real instance landed in the real subnet/security group.
 - **Resolved 7.1's open question for real:** on Terraform 1.16.1, the S3 lock file is `<key>.tflock`, caught live mid-`apply` — the naming mismatch 4.2 documented doesn't reproduce on this version.
 
-**Next up:** that wraps Module 7 — remote backends in 7.1, cross-stack sharing here in 7.2.
+**Next up:** [7.3](../../module-07.3-terraform-state-commands/README.md) — working with a state file directly, `list`/`show`/`mv`/`pull`/`rm`.
