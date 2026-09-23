@@ -1,6 +1,6 @@
 # 📘 Module 8.1: Introduction to AWS EC2 (Optional)
 
-> Module 8 is about Terraform provisioners — but provisioners run *inside* an instance once it exists, so the module opens with the instance itself. This lesson is marked optional in the course; skip it if EC2 basics are already familiar.
+> Module 8 is about Terraform provisioners — but provisioners run *inside* an instance once it exists, so I'm starting with the instance itself. Marking this one optional too — skip ahead if EC2 basics are already familiar.
 
 ---
 
@@ -20,11 +20,11 @@ An **AMI (Amazon Machine Image)** is a pre-configured template — the OS plus w
 
 An instance type is a specific combination of vCPU, memory, and network performance, grouped into families for different workload shapes: general purpose for a balanced mix, compute-optimized for CPU-heavy batch/data-modeling work, memory-optimized for large in-memory datasets.
 
-General purpose splits further into T2, T3, M5, and others, each in a range of sizes:
+General purpose splits further into T3, T4g, M6i/M7i, and others, each in a range of sizes — nano/micro/small up through 2xlarge and beyond, roughly doubling vCPU and memory at each step:
 
-![Table of T2 General Purpose instance types: t2.nano (1 vCPU, 0.5 GB) through t2.2xlarge (8 vCPU, 32 GB), with T2/T3/M5 family icons alongside](images/01-t2-general-purpose-instance-types.png)
+![Table of General Purpose instance sizes (shown here as T2: t2.nano through t2.2xlarge) scaling from 1 vCPU/0.5 GB up to 8 vCPU/32 GB](images/01-t2-general-purpose-instance-types.png)
 
-> ⚠️ **T2 is still sold, but it's not the current recommendation.** T3 runs on the AWS Nitro hypervisor, delivers up to ~30% better price-performance than T2 at the same size, and costs roughly 10% less per size — there's no cost or performance reason left to reach for T2 on a new deployment. **T4g** (Graviton/ARM-based) goes further still, up to ~40% better price-performance than T3. `t2.micro` shows up constantly in Terraform tutorials (including this repo's own labs) mostly because it's the classic Free Tier example — `t3.micro` is the more current equivalent where Free Tier eligibility allows it.
+**T3** runs on the AWS Nitro hypervisor and is my default for general-purpose burstable workloads — `t3.micro` in particular, since it's the Free Tier size I reach for in this repo's own labs. **T4g** (Graviton/ARM-based) is the step up from T3 when the workload can run on ARM — better price-performance still, at the cost of needing an ARM-compatible AMI.
 
 ---
 
@@ -34,7 +34,7 @@ General purpose splits further into T2, T3, M5, and others, each in a range of s
 
 ![Table of EBS volume types: io1 (SSD, business-critical apps), io2 (SSD, latency-sensitive transactional), gp2 (SSD, general purpose), st1 (HDD, throughput-intensive), sc1 (HDD, lowest-cost infrequent access)](images/02-ebs-volume-types.png)
 
-> ⚠️ **This table is missing a volume type.** It lists five (`io1`, `io2`, `gp2`, `st1`, `sc1`) — but `gp3` exists too, and [is now the default general-purpose SSD type AWS recommends](https://aws.amazon.com/ebs/volume-types/) if none is specified explicitly. `gp3` decouples IOPS and throughput from volume size (unlike `gp2`, where both scale with size), and it's typically cheaper than `gp2` at the same performance level. Six volume types today, not five: `gp2`, `gp3`, `io1`, `io2` (SSD), plus `st1`, `sc1` (HDD) — AWS generally steers new provisioned-IOPS volumes toward `io2` over `io1` (better durability at a comparable price), though both remain available.
+EBS offers six volume types in total. Three SSD: `gp3` ([the default when none is specified](https://aws.amazon.com/ebs/volume-types/), decoupling IOPS and throughput from volume size, unlike `gp2`), `gp2`, and `io2`/`io1` for provisioned-IOPS, latency-sensitive workloads (`io2` for better durability at a comparable price). Two HDD: `st1` for throughput-heavy access, `sc1` for the lowest-cost, infrequent-access tier.
 
 ---
 
@@ -67,9 +67,9 @@ Windows instances take the same idea via PowerShell or a `.bat` script instead.
 
 - ✅ An AMI is the OS + software template an instance boots from; its ID is region-specific
 - ✅ Instance types combine vCPU/memory/network performance into families (general purpose, compute-optimized, memory-optimized)
-- ⚠️ T2 still works but isn't the current recommendation — T3 (and T4g beyond that) beats it on both price and performance
+- ✅ T3 (Nitro hypervisor) is my default general-purpose choice, T4g the step up when ARM works for the workload
 - ✅ EBS is the attachable, persistent disk layer — chosen and sized at launch
-- ⚠️ EBS has six volume types today, not five — `gp3` is missing from the course's own diagram, and it's the current default recommendation
+- ✅ Six EBS volume types: `gp3` (the default), `gp2`, `io2`/`io1` (SSD), `st1`/`sc1` (HDD)
 - ✅ User data scripts run automatically on first boot — the way to bootstrap software without a manual SSH session afterward
 - ✅ Linux → SSH with a key pair; Windows → RDP with a password decrypted by that key pair
 
@@ -79,11 +79,11 @@ Windows instances take the same idea via PowerShell or a `.bat` script instead.
 
 **An EC2 instance is AMI (what it boots) + instance type (what it runs on) + EBS (what it stores on) + user data (what it does on first boot) — four independent choices that together define the instance.**
 
-- ✅ Reach for T3/T4g over T2, and `gp3` over `gp2`, on anything new — both are strict upgrades at this point
+- ✅ T3/T4g and `gp3` are my defaults on anything new
 - ⚠️ User data only runs once, on first boot — it's a bootstrap mechanism, not a way to push ongoing configuration changes
 
 ---
 
 ## Practice & Next Steps
 
-Look up the current-generation general purpose instance types (T3, T3a, T4g, M6i/M7i) in the [AWS instance types docs](https://aws.amazon.com/ec2/instance-types/) and compare vCPU/memory/price against the T2 sizes above. Then move to [8.2: Demo Deploying an EC2 Instance](../module-08.2-demo-deploying-an-ec2-instance/README.md), and from there to [8.3: AWS EC2 with Terraform](../module-08.3-aws-ec2-with-terraform/README.md) — where this module's actual subject, provisioners, needs a running instance to provision.
+Look up the current general purpose instance types (T3, T3a, T4g, M6i/M7i) in the [AWS instance types docs](https://aws.amazon.com/ec2/instance-types/) and compare vCPU/memory/price across the family. Then move to [8.2: Demo Deploying an EC2 Instance](../module-08.2-demo-deploying-an-ec2-instance/README.md), and from there to [8.3: AWS EC2 with Terraform](../module-08.3-aws-ec2-with-terraform/README.md) — where this module's actual subject, provisioners, needs a running instance to provision.

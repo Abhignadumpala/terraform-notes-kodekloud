@@ -89,7 +89,7 @@ curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://3.80.159.2/ --max-time 10
 curl: (28) Connection timed out
 ```
 
-**Expected, and correct** — the security group only ever opened port 22. Port 80 was never in scope for this lesson (it's about SSH access, not exposing a public webserver), and the timeout is proof the security group is doing exactly what it's configured to do: nginx runs, but only reachable from inside the instance itself unless a port-80 ingress rule gets added on top of this.
+**Expected, and correct** — the security group only ever opened port 22, not 80, since this lab is about SSH access, not exposing a public webserver. The timeout is proof the security group is doing exactly what it's configured to do: nginx runs, but only reachable from inside the instance itself unless a port-80 ingress rule gets added on top of this.
 
 ### 4. Independent confirmation via the AWS CLI
 

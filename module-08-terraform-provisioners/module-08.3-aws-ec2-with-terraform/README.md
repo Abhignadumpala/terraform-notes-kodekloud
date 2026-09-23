@@ -47,9 +47,9 @@ resource "aws_instance" "webserver" {
 }
 ```
 
-> ⚠️ **The course material's own AMI ID, `ami-0edab43b6fa892279`, is a specific, region-pinned snapshot from whenever the lesson was recorded** — hardcoded like that, it goes stale the moment Canonical publishes a newer Ubuntu build, and it's only valid in the one region it was looked up in (`us-west-1`, per the lesson). A `data "aws_ami"` block with `most_recent = true` finds whatever Canonical's current build actually is, in whatever region the provider is pointed at, every time `plan` runs — the same pattern already established in this repo's other EC2 labs ([4.2](../../module-04-terraform-state/module-04.2-terraform-state-considerations/README.md), [7.1](../../module-07-remote-state/module-07.1-s3-remote-backend-and-locking/README.md)), just for Ubuntu (Canonical's owner ID `099720109477`) instead of Amazon Linux.
+> 💡 `data "aws_ami"` with `most_recent = true` finds whatever Canonical's current Ubuntu build actually is, in whatever region the provider is pointed at, every time `plan` runs — the same pattern I already used in [4.2](../../module-04-terraform-state/module-04.2-terraform-state-considerations/README.md) and [7.1](../../module-07-remote-state/module-07.1-s3-remote-backend-and-locking/README.md), just for Ubuntu (Canonical's owner ID `099720109477`) instead of Amazon Linux.
 
-> 💡 `instance_type = "t3.micro"`, not the lesson's `t2.micro` — see [8.1](../module-08.1-introduction-to-aws-ec2/README.md#instance-types-cpu-memory-networking) for why.
+> 💡 `instance_type = "t3.micro"` — see [8.1](../module-08.1-introduction-to-aws-ec2/README.md#instance-types-cpu-memory-networking) for why I reach for T3 over T2 now.
 
 ---
 
@@ -117,7 +117,7 @@ resource "aws_instance" "webserver" {
 }
 ```
 
-> ⚠️ **The course material's `ingress { ... }` block, written directly inside `aws_security_group`, is no longer the current recommendation.** Since AWS provider v5, [`aws_vpc_security_group_ingress_rule`/`aws_vpc_security_group_egress_rule`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_ingress_rule) are — each rule becomes its own resource with its own ID, addable/removable/taggable independently instead of the whole security group being re-evaluated as one inline blob every time a rule changes. **Don't mix the two styles on the same security group** — inline blocks and separate rule resources fighting over the same rule set produces permanent plan diffs.
+> 💡 Each rule here is its own resource, [`aws_vpc_security_group_ingress_rule`/`aws_vpc_security_group_egress_rule`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_ingress_rule), with its own ID — addable, removable, and taggable independently of the security group itself or any other rule on it. **Don't mix this with inline `ingress`/`egress` blocks on the same security group** — the two styles fighting over the same rule set produces permanent plan diffs.
 >
 > Also worth being explicit about: an **egress rule isn't optional here** the way it might look. AWS security groups get a default allow-all-outbound rule when created via the console, but a security group built with zero inline `egress` blocks *and* zero separate egress-rule resources has no Terraform-managed outbound rule at all backing that assumption — the `apt update`/`apt install nginx` in `user_data` needs outbound internet access to work, so the explicit `aws_vpc_security_group_egress_rule` above isn't decorative.
 
@@ -126,9 +126,9 @@ resource "aws_instance" "webserver" {
 ## Summary
 
 - ✅ Three resources, three jobs: `aws_instance` (the machine), `aws_key_pair` (what can SSH in), `aws_security_group` + rules (what's allowed to reach it)
-- ✅ `data "aws_ami"` with `most_recent = true` replaces a hardcoded, region-pinned, eventually-stale AMI ID
+- ✅ `data "aws_ami"` with `most_recent = true` resolves the current AMI dynamically, in whatever region the provider targets
 - ✅ `tls_private_key` generates a key pair inside Terraform itself — no pre-existing local key file required, at the cost of the private key now living in state (mark it `sensitive`)
-- ⚠️ `aws_vpc_security_group_ingress_rule`/`_egress_rule` are the current recommendation over inline `ingress`/`egress` blocks — one rule, one resource, one ID
+- ✅ `aws_vpc_security_group_ingress_rule`/`_egress_rule` — one rule, one resource, one ID, managed independently
 - ⚠️ An explicit egress rule matters — `user_data`'s `apt install` needs outbound access, and an empty security group provides none by default in Terraform's own management of it
 
 ---

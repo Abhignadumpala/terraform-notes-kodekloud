@@ -37,7 +37,7 @@ function works only with files that are distributed as part of the
 configuration source code
 ```
 
-`file()` reads from disk at plan time — it can't read a file some other resource in the *same* apply hasn't created yet. Put together, these two errors are exactly why the source article's own example uses `file("/root/.ssh/web")`: a key pair generated **outside** Terraform, before `apply` ever runs, sidesteps both restrictions at once. Generated one for real:
+`file()` reads from disk at plan time — it can't read a file some other resource in the *same* apply hasn't created yet. Put together, these two errors are exactly why a pre-existing key, generated **outside** Terraform before `apply` ever runs, is the way around both restrictions at once. Generated one for real:
 
 ```bash
 ssh-keygen -t rsa -b 4096 -f ./web -N "" -C "module-08-4-provisioners"

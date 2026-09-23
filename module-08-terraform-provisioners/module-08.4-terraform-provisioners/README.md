@@ -116,7 +116,7 @@ provisioner "local-exec" {
 }
 ```
 
-> ⚠️ **The source article's own example has this backwards.** Its text says setting `on_failure` "allows Terraform to continue with resource creation even if the command fails" — but the code right below it sets `on_failure = fail`, which is the opposite: that's the *default*, error-and-stop behavior, not "continue." `fail` there doesn't demonstrate anything different from leaving `on_failure` off entirely. To actually get the described behavior — keep going despite the failure — it has to be `on_failure = continue`, as corrected above. Confirmed for real, both ways, in the [hands-on lab](hands-on-lab/README.md).
+> ⚠️ Worth being precise here, since it's easy to get backwards: `fail` is the *default* — error-and-stop behavior, the same as leaving `on_failure` off entirely. It's `on_failure = continue`, as above, that actually keeps `apply` going despite the failure. Confirmed for real, both ways, in the [hands-on lab](hands-on-lab/README.md).
 
 ---
 
