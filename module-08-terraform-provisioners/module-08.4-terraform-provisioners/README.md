@@ -18,8 +18,8 @@ A **provisioner** is a block inside a resource that tells Terraform "after (or b
 
 ```hcl
 resource "aws_instance" "webserver" {
-  ami           = "ami-0edab43b6fa892279"
-  instance_type = "t2.micro"
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
 
   provisioner "remote-exec" {
     inline = [
@@ -30,8 +30,8 @@ resource "aws_instance" "webserver" {
     ]
   }
 
-  key_name               = aws_key_pair.web.id
-  vpc_security_group_ids = [aws_security_group.ssh-access.id]
+  key_name               = aws_key_pair.web.key_name
+  vpc_security_group_ids = [aws_security_group.ssh_access.id]
 }
 ```
 
@@ -48,12 +48,14 @@ resource "aws_instance" "webserver" {
     type        = "ssh"
     host        = self.public_ip
     user        = "ubuntu"
-    private_key = file("/root/.ssh/web")
+    private_key = file("${path.module}/web")
   }
 }
 ```
 
 `self.public_ip` refers to this same resource's own `public_ip` attribute — the instance being provisioned connects to *itself*, once it has an IP to connect to.
+
+> 💡 `type = "ssh"` is for Linux. A Windows instance takes `type = "winrm"` instead, with a `user`/`password` pair rather than a private key — same idea, different transport.
 
 ---
 
@@ -63,7 +65,7 @@ resource "aws_instance" "webserver" {
 resource "aws_instance" "webserver" {
   # ...
   provisioner "local-exec" {
-    command = "echo ${aws_instance.webserver.public_ip} >> /tmp/ips.txt"
+    command = "echo ${self.public_ip} >> ${path.module}/ips.txt"
   }
 }
 ```
@@ -80,17 +82,19 @@ Provisioners run at creation by default. Add `when = destroy` to run one right b
 resource "aws_instance" "webserver" {
   # ...
   provisioner "local-exec" {
-    command = "echo Instance ${aws_instance.webserver.public_ip} Created! > /tmp/instance_state.txt"
+    command = "echo Instance ${self.public_ip} Created! > ${path.module}/instance_state.txt"
   }
 
   provisioner "local-exec" {
     when    = destroy
-    command = "echo Instance ${aws_instance.webserver.public_ip} Destroyed! > /tmp/instance_state.txt"
+    command = "echo Instance ${self.public_ip} Destroyed! > ${path.module}/instance_state.txt"
   }
 }
 ```
 
-Both provisioners reference `aws_instance.webserver.public_ip` — that still resolves at `destroy` time because Terraform reads it from state, not from the (already-gone) real instance.
+Both provisioners reference `self.public_ip` — that still resolves at `destroy` time because Terraform reads it from state, not from the (already-gone) real instance.
+
+> ⚠️ A destroy-time provisioner only accepts `self`, `count.index`, or `each.key` — not even this same resource's own fully-qualified address (`aws_instance.webserver.public_ip` instead of `self.public_ip`) is allowed. Tried it for real against a minimal resource: `terraform plan` refuses to run at all, with `Error: Invalid reference from destroy provisioner`. `self` isn't a style preference here, it's the only option.
 
 ---
 
@@ -112,7 +116,7 @@ Output: The system cannot find the path specified.
 ```hcl
 provisioner "local-exec" {
   on_failure = continue
-  command    = "echo Instance ${aws_instance.webserver.public_ip} Created! > /temp/instance_state.txt"
+  command    = "echo Instance ${self.public_ip} Created! > /temp/instance_state.txt"
 }
 ```
 
@@ -126,8 +130,8 @@ HashiCorp's own guidance: use a provisioner only when nothing native does the jo
 
 ```hcl
 resource "aws_instance" "webserver" {
-  ami           = "ami-0edab43b6fa892279"
-  instance_type = "t2.micro"
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
   tags = {
     Name        = "webserver"
     Description = "An NGINX WebServer on Ubuntu"
