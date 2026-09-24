@@ -134,6 +134,32 @@ variable "key" {
 
 > ⚠️ An AMI ID only works in one region, and AMI IDs get replaced over time. I check the current Ubuntu AMI ID for my region before using this default.
 
+A safer way is to not hard-code the AMI ID at all, and look it up with a `data` block instead. Terraform then finds the latest Ubuntu AMI in whatever region I'm working in, so I never use a wrong or old ID:
+
+```hcl
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical, the publisher of Ubuntu
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+}
+
+resource "aws_instance" "webserver" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  key_name      = var.key
+
+  lifecycle {
+    ignore_changes = [ami]
+  }
+}
+```
+
+With this, the `ami` variable isn't needed. The `lifecycle` block stops one surprise: when Ubuntu publishes a newer AMI, the lookup returns a new ID, and without `ignore_changes` Terraform would destroy and recreate my instance to use it. I used the same lookup in [8.3](../../module-08-terraform-provisioners/module-08.3-aws-ec2-with-terraform/README.md). Official docs: [`aws_ami` data source](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ami).
+
 When I run Terraform commands from inside the `aws-instance` folder, that folder is called the **root module**.
 
 Official docs: [Modules overview](https://developer.hashicorp.com/terraform/language/modules).
