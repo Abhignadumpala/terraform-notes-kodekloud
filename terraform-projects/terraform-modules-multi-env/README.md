@@ -113,8 +113,12 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "tfstate" {
-  bucket        = "abhigna-tfstate-2026" # must be globally unique — change it
-  force_destroy = true                   # lab only; real projects use prevent_destroy
+  bucket = "abhigna-tfstate-2026" # must be globally unique — change it
+
+  # The state bucket holds every environment's state — Terraform refuses to destroy it
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Keep old versions of the state file, so a bad apply can be recovered
@@ -147,6 +151,8 @@ terraform apply
 ```
 
 ✅ **Checkpoint:** `aws s3 ls | grep tfstate` shows my bucket.
+
+> ⚠️ With `prevent_destroy = true`, any plan that would delete this bucket fails with `Instance cannot be destroyed`. That's the point — losing this bucket means losing the state of every environment. Phase 11 shows how to remove it on purpose.
 
 ---
 
@@ -846,7 +852,17 @@ Destroy the environments first, the backend bucket last (the environments need i
 cd ../production && terraform destroy
 cd ../staging && terraform destroy
 cd ../dev && terraform destroy
-cd ../../bootstrap && terraform destroy
+```
+
+The state bucket is protected by `prevent_destroy`, so `terraform destroy` in `bootstrap/` fails on purpose. In a real project I keep this bucket — it costs almost nothing. To remove it anyway:
+
+1. In `bootstrap/main.tf`, delete the `lifecycle { prevent_destroy = true }` block and add `force_destroy = true` to the bucket (the bucket is versioned, so it still holds old state versions that S3 won't delete by itself).
+2. Apply that change first, then destroy:
+
+```bash
+cd ../../bootstrap
+terraform apply     # only updates force_destroy, nothing is deleted
+terraform destroy
 ```
 
 ---
@@ -873,6 +889,7 @@ Now production can stay on `v1.0.0` while dev tests `v1.1.0`.
 | `Backend configuration changed` | Edited the backend block | `terraform init -reconfigure` |
 | S3 bucket does not exist | Bootstrap not applied, or name typo | Run Phase 1; match names exactly |
 | `Variables may not be used here` | Used `var.` inside backend | Type the values directly |
+| `Instance cannot be destroyed` | `prevent_destroy` on the state bucket | Expected — see Phase 11 to remove it on purpose |
 | `Error acquiring the state lock` | Another apply running, or one crashed | Wait; if it crashed, `terraform force-unlock <ID>` |
 | `curl` times out | nginx still installing, or port 80 missing | Wait 2 min; check the security group rules |
 | `Unsupported argument "use_lockfile"` | Terraform older than 1.11 | Upgrade Terraform |
