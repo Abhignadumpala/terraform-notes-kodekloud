@@ -66,7 +66,7 @@ Only `terraform.tfvars` and the backend `key` are different — the module code 
 - [x] `modules/iam`
 - [x] `modules/ec2`
 - [x] `modules/nginx-web-app`
-- [ ] `environments/dev` — write, apply, test in browser
+- [x] `environments/dev` — applied, nginx page works in the browser
 - [ ] `environments/staging`
 - [ ] `environments/production`
 
@@ -109,10 +109,17 @@ What [`bootstrap/main.tf`](bootstrap/main.tf) creates:
 ```bash
 cd bootstrap
 terraform init
+terraform plan
 terraform apply
 ```
 
-✅ **Checkpoint:** `aws s3 ls | grep abhigna-tfstate-2026` shows my bucket.
+![bootstrap/main.tf next to terraform init — provider v6.66.0 reused from the lock file](images/01-bootstrap-init.png)
+
+![terraform plan in bootstrap — Plan: 3 to add, 0 to change, 0 to destroy](images/02-bootstrap-plan-3-to-add.png)
+
+![terraform apply in bootstrap — bucket, versioning and public access block created, output state_bucket_name = abhigna-tfstate-2026](images/03-bootstrap-apply.png)
+
+✅ **Checkpoint:** `Apply complete! Resources: 3 added` and the output `state_bucket_name = "abhigna-tfstate-2026"`. `aws s3 ls | grep abhigna-tfstate-2026` shows my bucket.
 
 > ⚠️ `bootstrap/terraform.tfstate` stays on my laptop and git ignores it. It's the only record of the bucket, so I keep it safe.
 
@@ -133,6 +140,14 @@ terraform apply
 
 **Inputs:** `environment`, `vpc_cidr`, `public_subnet_cidr` → **Outputs:** `vpc_id`, `public_subnet_id`
 
+![modules/vpc variables.tf and outputs.tf](images/04-vpc-module-variables-outputs.png)
+
+To check a module on its own, I run `terraform init -backend=false` and `terraform validate` inside its folder. My first try was `validate` without `init`, which fails with `Missing required provider` — `init` has to download the AWS provider first:
+
+![modules/vpc/main.tf — terraform validate fails with Missing required provider, then terraform init installs hashicorp/aws v6.66.0](images/05-vpc-module-missing-provider-then-init.png)
+
+> ⚠️ A module folder is only for `init` + `validate` — never `plan` or `apply`. When I ran `terraform plan` inside `modules/vpc`, Terraform asked me to type `var.environment` by hand, because nobody passes values into a module run on its own. The environments pass the values, so `plan` belongs there. Afterwards I delete `.terraform/` and `.terraform.lock.hcl` from the module folder.
+
 ### `modules/security-group` — the firewall
 
 | Resource | Name in code | What it does |
@@ -143,6 +158,12 @@ terraform apply
 | `aws_vpc_security_group_egress_rule` | `all_outbound` | all outbound traffic, so EC2 can download nginx |
 
 **Inputs:** `environment`, `vpc_id`, `ssh_cidr` → **Output:** `security_group_id`
+
+![modules/security-group/main.tf — the security group and its three rules](images/06-security-group-module-main.png)
+
+![modules/security-group variables.tf and outputs.tf](images/07-security-group-module-variables-outputs.png)
+
+> 💡 `ssh_cidr` is **my Ubuntu machine's public IPv4**, not the EC2's IP — AWS gives EC2 its own IP. I get mine with `curl https://checkip.amazonaws.com` (plain `curl ifconfig.me` gave me an IPv6 address, which doesn't fit a `cidr_ipv4` rule) and add `/32` = exactly one address. It's only for SSH: Terraform talks to AWS with my access keys, and the nginx page on port 80 is open to everyone.
 
 > 💡 Each rule is its own resource instead of `ingress {}` / `egress {}` blocks inside the security group — that's what the AWS provider docs recommend now. And when Terraform creates a security group, it removes AWS's default "allow all outbound" rule, so I write the egress rule myself. Without it, EC2 can't install nginx.
 
@@ -158,6 +179,8 @@ terraform apply
 
 > 💡 IAM names are global in the AWS account (not per region), so the environment name goes in front: `dev-nginx-ec2-role`, `production-nginx-ec2-role`.
 
+![modules/iam main.tf, variables.tf and outputs.tf — outputs.tf has the depends_on on the SSM policy attachment](images/08-iam-module.png)
+
 ### `modules/ec2` — the nginx server
 
 | Resource | Name in code | What it does |
@@ -171,6 +194,8 @@ Extra settings on the instance:
 - `key_name` is optional (`default = null`) — without a key pair I use Session Manager instead of SSH.
 
 **Inputs:** `environment`, `instance_type`, `subnet_id`, `security_group_id`, `instance_profile_name`, `key_name` → **Outputs:** `public_ip`, `instance_id`
+
+![modules/ec2 main.tf, variables.tf and outputs.tf](images/09-ec2-module.png)
 
 ---
 
@@ -192,6 +217,8 @@ module "ec2" {
 ```
 
 **Inputs:** `environment`, `vpc_cidr`, `public_subnet_cidr`, `ssh_cidr`, `instance_type`, `key_name` → **Outputs:** `public_ip`, `instance_id`, `nginx_url`
+
+![modules/nginx-web-app main.tf calling vpc, security_group, iam and ec2, plus its variables.tf and outputs.tf](images/10-nginx-web-app-module.png)
 
 > 💡 **Paths:** inside `nginx-web-app` the sources are `../vpc`, `../ec2`… (one level up). From an environment it's `../../modules/nginx-web-app` (two levels up).
 
@@ -289,23 +316,60 @@ instance_type      = "t3.micro"
 
 Passes up `public_ip`, `instance_id` and `nginx_url` from `module.nginx_web_app`.
 
+![The four dev files: main.tf, variables.tf, terraform.tfvars and outputs.tf](images/11-dev-environment-files.png)
+
 ### Run it
 
 ```bash
 cd environments/dev
+cp ../../bootstrap/.terraform.lock.hcl .   # so init reuses the cached provider instead of downloading it again
 terraform init
-terraform fmt -recursive ../..
+terraform fmt -recursive ../..             # tidy every .tf file in the project
 terraform validate
 terraform plan
 terraform apply
 ```
 
-✅ **Checkpoints:**
+**init → fmt → validate:** `init` connects dev to the S3 backend and finds all five modules; the provider comes from the shared cache in seconds.
 
-- `Plan: 13 to add` — 5 VPC + 4 security group (1 SG + 3 rules) + 3 IAM + 1 EC2.
-- `terraform state list` — every address starts with `module.nginx_web_app.`, for example `module.nginx_web_app.module.ec2.aws_instance.nginx_server`.
-- Wait 1–2 minutes for nginx to install, then open the `nginx_url` output in the browser (or `curl $(terraform output -raw nginx_url)`). I should see **Hello from dev nginx**.
-- State is in S3, not on my laptop: `aws s3 ls s3://abhigna-tfstate-2026/dev/`.
+![terraform init in dev — backend s3 configured, the five modules found, hashicorp/aws v6.66.0 from the shared cache directory; then fmt and validate Success](images/12-dev-init-fmt-validate.png)
+
+**plan:** every address starts with `module.nginx_web_app.module.<name>` — the resources live two modules deep.
+
+![terraform plan — module.nginx_web_app.module.ec2.aws_instance.nginx_server will be created](images/13-dev-plan-module-addresses.png)
+
+![Plan: 13 to add, 0 to change, 0 to destroy, with outputs instance_id, nginx_url and public_ip known after apply](images/14-dev-plan-13-to-add.png)
+
+**apply:** Terraform builds in dependency order — VPC first, then the internet gateway, subnet and security group, the IAM role and profile, and the EC2 instance last.
+
+![terraform apply — Apply complete! Resources: 13 added, with the three outputs](images/15-dev-apply-complete.png)
+
+✅ **Checkpoints (my real results):**
+
+- `Plan: 13 to add` — 5 VPC + 4 security group (1 SG + 3 rules) + 3 IAM + 1 EC2. `terraform state list` shows 15 lines: the 13 resources plus the 2 data sources (AZs and AMI).
+- `Apply complete! Resources: 13 added, 0 changed, 0 destroyed.`
+- About 2 minutes later, the `nginx_url` output opens **Hello from dev nginx** (`curl $(terraform output -raw nginx_url)` shows the same):
+
+  ![Browser at the EC2 public IP showing Hello from dev nginx](images/16-dev-nginx-in-browser.png)
+
+- In the EC2 console, `dev-nginx-server` is running as `t3.micro` with 3/3 status checks passed:
+
+  ![EC2 console — dev-nginx-server running, t3.micro, 3/3 checks passed, eu-west-1a](images/17-ec2-console-running.png)
+
+- The instance summary proves every module did its job: VPC `dev-vpc` and subnet `dev-public-subnet` (vpc module), IAM role `dev-nginx-ec2-role` (iam module), IMDSv2 `Required` (ec2 module), and the `default_tags` from the provider — `Environment`, `ManagedBy`, `Project` — next to the `Name` tag:
+
+  ![EC2 instance summary — IAM role dev-nginx-ec2-role, t3.micro, dev-vpc, dev-public-subnet, IMDSv2 Required, and tags Name, ManagedBy, Environment, Project](images/18-ec2-instance-summary-iam-tags.png)
+
+- State is in S3, not on my laptop — there's no `terraform.tfstate` in the dev folder. The bucket has a `dev/` folder holding `terraform.tfstate`:
+
+  ![S3 — the abhigna-tfstate-2026 bucket in eu-west-1](images/19-s3-state-bucket.png)
+
+  ![S3 — dev/terraform.tfstate, 29.9 KB](images/20-s3-dev-terraform-tfstate.png)
+
+- The state file is private: on its Permissions tab, **Everyone (public access)** and **Authenticated users** have no access — that's the public access block from bootstrap working:
+
+  ![S3 terraform.tfstate permissions — only the bucket owner has access, Everyone and Authenticated users have none](images/21-s3-tfstate-no-public-access.png)
+
 - Session Manager works: EC2 console → my instance → **Connect** → **Session Manager** (give it 2–3 minutes after boot).
 
 ---
