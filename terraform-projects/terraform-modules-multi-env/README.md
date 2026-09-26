@@ -49,7 +49,7 @@ environments/dev/terraform.tfvars
 |--|-----|---------|------------|
 | VPC CIDR | `10.0.0.0/16` | `10.1.0.0/16` | `10.2.0.0/16` |
 | Public subnet CIDR | `10.0.1.0/24` | `10.1.1.0/24` | `10.2.1.0/24` |
-| Instance type | `t3.micro` | `t3.micro` | `t3.small` |
+| Instance type | `t3.micro` | `t3.small` | `t3.small` |
 | State file in S3 | `dev/terraform.tfstate` | `staging/terraform.tfstate` | `production/terraform.tfstate` |
 
 Only `terraform.tfvars` and the backend `key` are different — the module code is the same for all three.
@@ -67,7 +67,8 @@ Only `terraform.tfvars` and the backend `key` are different — the module code 
 - [x] `modules/ec2`
 - [x] `modules/nginx-web-app`
 - [x] `environments/dev` — applied, nginx page works in the browser
-- [ ] `environments/staging`
+- [x] Break & Fix — 5 module errors (+1 bonus) made and fixed in dev
+- [x] `environments/staging` — applied, plus 4 copy-an-environment errors (wrong key, tfvars, state lock)
 - [ ] `environments/production`
 
 ---
@@ -77,7 +78,7 @@ Only `terraform.tfvars` and the backend `key` are different — the module code 
 ```bash
 terraform -version            # 1.11 or newer (needed for S3 native locking)
 aws sts get-caller-identity   # confirms my AWS credentials work
-curl ifconfig.me              # my public IP — goes into ssh_cidr as x.x.x.x/32
+curl https://checkip.amazonaws.com   # my public IPv4 — goes into ssh_cidr as x.x.x.x/32
 ```
 
 `.gitignore` keeps state and downloaded providers out of git:
@@ -216,7 +217,7 @@ module "ec2" {
 }
 ```
 
-**Inputs:** `environment`, `vpc_cidr`, `public_subnet_cidr`, `ssh_cidr`, `instance_type`, `key_name` → **Outputs:** `public_ip`, `instance_id`, `nginx_url`
+**Inputs:** `environment`, `vpc_cidr`, `public_subnet_cidr`, `ssh_cidr`, `instance_type`, `key_name` → **Outputs:** `public_ip`, `instance_id`, `nginx_url`, `vpc_id` (added in Break & Fix 4)
 
 ![modules/nginx-web-app main.tf calling vpc, security_group, iam and ec2, plus its variables.tf and outputs.tf](images/10-nginx-web-app-module.png)
 
@@ -374,33 +375,201 @@ terraform apply
 
 ---
 
-## Step 5 — Staging and Production
+## Step 5 — Break & Fix: Module Errors in Dev
 
-No module code is written again. I copy the four dev files and change only two things:
+Once dev worked, I broke the code on purpose to see the errors people really hit when working with modules — then fixed each one. All of these are caught by `terraform validate`, run from `environments/dev`: validate checks the whole chain `dev → nginx-web-app → vpc/sg/iam/ec2`, so it finds mistakes inside the modules too, and the `on <file> line <N>` part points straight at the module file.
 
-```bash
-cd environments
-cp dev/main.tf dev/variables.tf dev/outputs.tf dev/terraform.tfvars staging/
-cp dev/main.tf dev/variables.tf dev/outputs.tf dev/terraform.tfvars production/
+> 💡 **How I read any Terraform error:** the first line is the error *type* (`Missing required argument`, `Unsupported argument`…), `on <file> line <N>` says *where*, and the last sentence usually says the *fix*.
+
+### 1. Forgot to pass a variable into a module — `Missing required argument`
+
+**Break:** in `modules/nginx-web-app/main.tf`, I deleted `ssh_cidr = var.ssh_cidr` from `module "security_group"`.
+
+![validate — Missing required argument: The argument "ssh_cidr" is required, but no definition was found, pointing at nginx-web-app/main.tf line 13](images/22-bf1-missing-required-argument.png)
+
+**Why:** `variable "ssh_cidr"` in the security-group module has no `default`, so whoever calls the module **must** pass it.
+**Fix:** put the line back (or, when it makes sense, give the variable a `default`).
+
+![ssh_cidr line back — validate Success](images/23-bf1-fixed.png)
+
+### 2. Typo in an argument name — `Unsupported argument`
+
+**Break:** `vpc_cidr` → `vpc_cidrr` inside `module "vpc"`.
+
+![validate — Unsupported argument: An argument named "vpc_cidrr" is not expected here. Did you mean "vpc_cidr"?](images/24-bf2-unsupported-argument.png)
+
+**Why:** the name on the left of `=` must match a `variable` block in the module being called. Terraform even suggests the right one: *Did you mean "vpc_cidr"?* Only this one error shows — Terraform stops at the wrong name before it checks for the missing one.
+**Fix:** correct the spelling.
+
+![vpc_cidr spelled right — validate Success](images/25-bf2-fixed.png)
+
+### 3. Asking a module for an output it doesn't have — `Unsupported attribute`
+
+**Break:** in `module "ec2"`, `module.vpc.public_subnet_id` → `module.vpc.subnet_id`.
+
+![validate — Unsupported attribute: module.vpc is object with 2 attributes. This object does not have an attribute named "subnet_id"](images/26-bf3-unsupported-attribute.png)
+
+**Why:** a module is a closed box. From outside I can only read what its `outputs.tf` lists — the vpc module has exactly **2** outputs (`vpc_id`, `public_subnet_id`), which is what `module.vpc is object with 2 attributes` means.
+**Fix:** use the real output name.
+
+![module.vpc.public_subnet_id back — validate Success](images/27-bf3-fixed.png)
+
+### Bonus: a missing `=` — `Invalid block definition`
+
+I also tried deleting the `=` in `environment = var.environment` inside `module "ec2"`:
+
+![validate — Invalid block definition: Either a quoted string block label or an opening brace is expected here, at nginx-web-app/main.tf line 34](images/28-bonus-invalid-block-definition.png)
+
+**Why:** without `=`, Terraform reads `environment var.environment` as the start of a new *block* (like `resource "..." {`), not an argument. A syntax error like this shows up before any module checks.
+**Fix:** put the `=` back.
+
+![= back — validate Success](images/29-bonus-fixed.png)
+
+### 4. Reaching into a nested module ⭐ — outputs go up one level at a time
+
+This is the most common module mistake. I wanted the VPC ID as an output of dev, so I added to `environments/dev/outputs.tf`:
+
+```hcl
+output "vpc_id" {
+  value = module.nginx_web_app.vpc_id
+}
 ```
 
-1. **Backend key** in `main.tf`: `staging/terraform.tfstate` / `production/terraform.tfstate`
-2. **Values** in `terraform.tfvars`: `environment`, `vpc_cidr`, `public_subnet_cidr`, `instance_type` — see the table at the top.
+![validate — Unsupported attribute: module.nginx_web_app is object with 3 attributes. This object does not have an attribute named "vpc_id"](images/30-bf4-nested-output-error.png)
 
-```bash
-cd staging    && terraform init && terraform apply
-cd ../production && terraform init && terraform apply
+**Why:** the vpc module *does* output `vpc_id` — but only to `nginx-web-app`, the box directly around it. Dev can only see what `nginx-web-app` shows in **its own** `outputs.tf`, and that had just 3 outputs: `public_ip`, `instance_id`, `nginx_url`:
+
+![modules/nginx-web-app/outputs.tf with only public_ip, instance_id and nginx_url — no vpc_id](images/31-bf4-nginx-web-app-outputs-no-vpc-id.png)
+
+```
+vpc/outputs.tf            output "vpc_id" = aws_vpc.nginx_vpc.id          ✅ already there
+        ↓
+nginx-web-app/outputs.tf  output "vpc_id" = module.vpc.vpc_id             ← was missing
+        ↓
+dev/outputs.tf            output "vpc_id" = module.nginx_web_app.vpc_id
 ```
 
-✅ **Checkpoints:**
+**Fix:** pass it up one more level — add `output "vpc_id" { value = module.vpc.vpc_id }` to `modules/nginx-web-app/outputs.tf`. I kept this output for real; it's useful.
 
-- Each page says `Hello from staging nginx` / `Hello from production nginx`.
-- `aws s3 ls s3://abhigna-tfstate-2026/ --recursive` shows three separate state files.
-- In the VPC console, the three environments are in three different VPCs — fully isolated.
+![vpc_id output added to nginx-web-app/outputs.tf — validate Success](images/32-bf4-fixed-output-passed-up.png)
+
+> **Rule:** a value can only go up one box at a time. If an environment needs something from deep inside, every module in between must output it. And adding an output never touches AWS — `plan` shows it under *Changes to Outputs* with no resource changes.
+
+### 5. Changed a module's `source` without `init` — `Module source has changed`
+
+**Break:** in `environments/dev/main.tf`, `../../modules/nginx-web-app` → `../../modules/nginx-webapp`.
+
+![validate and plan both fail — Module source has changed: The source address was changed since this module was installed. Run "terraform init"](images/33-bf5-module-source-changed.png)
+
+**Why:** `terraform init` records where every module lives (in `.terraform/modules/modules.json`). When the code says a different path than that record, Terraform refuses to guess. (If I ran `init` with the typo, it would fail too — that folder doesn't exist.)
+**Fix:** put the right path back, run `terraform init`, then `validate`.
+
+![source fixed — validate Success](images/34-bf5-fixed.png)
+
+> **When do I need `terraform init` again?** After changing a module `source` or adding a new `module` block, changing the provider or its version, or changing the `backend` block. Normal edits inside a module (resources, variables, outputs) don't need it.
 
 ---
 
-## Step 6 — Clean Up (Order Matters)
+## Step 6 — Staging: Copying Dev (and the Mistakes That Come With It)
+
+No module code is written again — staging is dev's four files with a different backend key and different values. But copying an environment is exactly where real mistakes happen, so I made them on purpose, one by one.
+
+```bash
+cd environments
+cp dev/main.tf dev/variables.tf dev/outputs.tf dev/terraform.tfvars dev/.terraform.lock.hcl staging/
+cd staging
+```
+
+I don't copy `dev/.terraform/` — every environment folder runs its own `init`.
+
+### Error A — a new folder needs `init` first
+
+Right after copying, `terraform plan`:
+
+![plan in the new staging folder — Backend initialization required, please run "terraform init". Reason: Initial configuration of the requested backend "s3"](images/35-staging-backend-init-required.png)
+
+**Why:** there's no `.terraform/` yet, so Terraform doesn't know where the state is or where the modules are. **Fix:** `terraform init`.
+
+![terraform init in staging — backend s3 configured, five modules found, provider from the shared cache](images/36-staging-init.png)
+
+### Error B — forgot to change the backend key 🚨 (the dangerous one)
+
+`init` worked — but `main.tf` still said `key = "dev/terraform.tfstate"`. Then `terraform plan` **from the staging folder**:
+
+![plan in staging refreshing dev's resources — ids vpc-013ce71f78727b494, dev-nginx-ec2-role, i-0b6a5f98be7bada6b — with only a new vpc_id output](images/37-staging-wrong-key-reads-dev-state.png)
+
+No red error at all — and that's why it's dangerous. Every `Refreshing state... [id=...]` line is a **dev** resource: `dev-nginx-ec2-role`, dev's VPC `vpc-013ce71f78727b494`, dev's instance `i-0b6a5f98be7bada6b`. The staging folder had opened **dev's state file** and was now in control of my dev servers. Changing `environment = "staging"` and applying would have renamed or replaced dev.
+
+**How I'd catch it in real life:**
+- A **brand-new** environment's first plan must be `13 to add`. `No changes` or any `Refreshing state` line in a new folder means it found someone else's state.
+- Read the IDs and names in the plan — here they all said `dev`.
+- Right after `init` in a new folder: `terraform state list` must be **empty**, and `grep key main.tf` must match the folder name.
+- In teams: plans are reviewed in pull requests (Atlantis, GitHub Actions, HCP Terraform), and each environment usually lives in its **own AWS account**, so staging's credentials can't even see dev.
+
+**Fix:** change the key to `staging/terraform.tfstate`. Terraform then notices the backend changed and stops — first on `plan`, then on a plain `init`:
+
+![key changed to staging/terraform.tfstate — plan fails with Backend initialization required. Reason: Backend configuration block has changed](images/38-staging-key-changed-backend-block-changed.png)
+
+![terraform init fails with Backend configuration changed, then terraform init -reconfigure succeeds](images/39-staging-init-reconfigure.png)
+
+| Flag | What it does | Here? |
+|---|---|---|
+| `-reconfigure` | point at the new key, copy nothing | ✅ yes |
+| `-migrate-state` | **copy** the old state (dev's!) into the new key | ❌ no — staging would own a copy of dev's state |
+
+`-migrate-state` is for *moving* an environment's state to a new place, not for creating a new environment. After `-reconfigure`, `terraform state list` printed nothing — staging finally had its own empty state.
+
+### Error C — copied tfvars pass the plan but are still wrong
+
+With the right key, `plan` said `13 to add` — but `terraform.tfvars` still had dev's values, so everything was named `dev-...` with `Environment = "dev"` and dev's `10.0.0.0/16`:
+
+![staging plan — 13 to add, but tags say dev-public-subnet, Environment = dev and cidr_block 10.0.0.0/16](images/40-staging-tfvars-still-dev-values.png)
+
+Applying this would have failed halfway with `EntityAlreadyExists: Role with name dev-nginx-ec2-role already exists` — IAM names are **global in the account** (the VPC and security group wouldn't clash, so they'd already be created with dev's names — a half-built mess).
+
+I first fixed only `environment`, and the plan still showed `cidr_block = "10.0.0.0/16"`. That one wouldn't even fail — AWS allows two VPCs with the same range — but overlapping ranges can **never** be connected later (VPC peering, VPN, Transit Gateway), and changing a VPC's CIDR means rebuilding the whole network. So each environment gets its own range from day one.
+
+**Fix:** the real staging values — and I made staging a bit bigger:
+
+```hcl
+region             = "eu-west-1"
+environment        = "staging"
+vpc_cidr           = "10.1.0.0/16"
+public_subnet_cidr = "10.1.1.0/24"
+ssh_cidr           = "x.x.x.x/32" # my IP
+instance_type      = "t3.small"   # not free tier — destroy when done
+```
+
+![staging plan — 13 to add with staging-vpc, staging-public-subnet, Environment = staging and cidr_block 10.1.0.0/16](images/41-staging-plan-13-to-add.png)
+
+> 💡 When copying an environment, read the **values** in the plan — CIDRs, names, tags — not just the count at the bottom.
+
+### Error D — two applies at once: `Error acquiring the state lock`
+
+I ran `terraform apply` while another apply on staging was already running. The second one stopped before touching anything:
+
+![Error acquiring the state lock — PreconditionFailed, Lock Info with ID, Path abhigna-tfstate-2026/staging/terraform.tfstate, Operation OperationTypeApply; then apply again: Acquiring state lock, No changes, Apply complete 0 added, with the staging outputs](images/42-staging-state-lock-then-apply.png)
+
+**Why:** `use_lockfile = true` in the backend. While an apply runs, Terraform keeps a lock file (`terraform.tfstate.tflock`) next to the state in S3; S3 refuses a second one (`412 PreconditionFailed`). Without the lock, both applies could have built two VPCs and two servers and corrupted the state.
+
+**Fix:** just wait and run it again — the second try said *Acquiring state lock… No changes… Apply complete! Resources: 0 added*, because the first apply had already built everything. `terraform force-unlock <ID>` is only for a lock left behind by a **crashed** run — never while another run is still going.
+
+### ✅ Staging checkpoints (my real results)
+
+- `Apply complete! Resources: 13 added` — outputs `nginx_url = "http://3.255.132.48"`, `vpc_id = "vpc-0dd0a3443093a8253"`.
+- `curl http://3.255.132.48` → `<h1>Hello from staging nginx</h1>`, and the dev page **still** says `Hello from dev nginx` — staging never touched dev.
+- `aws s3 ls s3://abhigna-tfstate-2026/ --recursive` → two separate files: `dev/terraform.tfstate` and `staging/terraform.tfstate`.
+- Two servers in two VPCs: `dev-nginx-server` (`t3.micro`, `10.0.0.0/16`) and `staging-nginx-server` (`t3.small`, `10.1.0.0/16`).
+
+---
+
+## Step 7 — Production
+
+Same as staging, with no new module code: copy the files, set `key = "production/terraform.tfstate"`, run `terraform init` (then check `terraform state list` is empty), and use production's values — `10.2.0.0/16` / `10.2.1.0/24` and `t3.small` (see the table at the top).
+
+---
+
+## Step 8 — Clean Up (Order Matters)
 
 Environments first, the backend bucket last (the environments need it to read their state).
 
@@ -445,12 +614,19 @@ Right now every environment uses the local `../../modules` path, so a module cha
 | `terraform init` very slow / stuck on `Installing hashicorp/aws` | The AWS provider is a ~180 MB download, and Terraform only reuses the `plugin_cache_dir` copy when the folder already has a `.terraform.lock.hcl` | Copy `bootstrap/.terraform.lock.hcl` into the folder first, then `terraform init` says `Using ... from the shared cache directory` |
 | `Reference to undeclared input variable` | `var.x` used in `main.tf` but not in `variables.tf` | Add the `variable "x"` block |
 | `Reference to undeclared resource` | Renamed a resource but not every reference | Match `TYPE.NAME.ATTRIBUTE` everywhere |
-| `Module not installed` | Added or changed a module call | `terraform init` |
-| `Backend configuration changed` | Edited the backend block | `terraform init -reconfigure` |
+| `Module not installed` / `Module source has changed` | Added a module call or changed its `source` | `terraform init` |
+| `Missing required argument` | A module variable with no default wasn't passed | Pass it in the `module` block (or give the variable a default) |
+| `Unsupported argument` … `Did you mean …?` | Typo in an argument name inside a `module` block | Use the exact name from the module's `variables.tf` |
+| `Unsupported attribute` … `object with N attributes` | Reading an output the module doesn't have — often a nested module's output | Add the output to that module's `outputs.tf`, one level at a time |
+| `Invalid block definition` | Missing `=` between an argument and its value | Put the `=` back |
+| `Backend initialization required` | New environment folder, or backend block changed | `terraform init` (after a change: `-reconfigure`) |
+| New environment's plan shows `Refreshing state` / `No changes` | Backend `key` still points at another environment's state | ⛔ Don't apply — fix the key, `terraform init -reconfigure`, check `terraform state list` is empty |
+| `EntityAlreadyExists` (IAM role) | Copied tfvars still use another environment's `environment` name | Change `environment` in tfvars — IAM names are global in the account |
+| `Backend configuration changed` | Edited the backend block | `terraform init -reconfigure` for a new env (`-migrate-state` only to *move* existing state) |
 | S3 bucket does not exist | Bootstrap not applied, or name typo | Run Step 1; match names exactly |
 | `Variables may not be used here` | Used `var.` inside backend | Type the values directly |
-| `Instance cannot be destroyed` | `prevent_destroy` on the state bucket | Expected — see Step 6 to remove it on purpose |
-| `Error acquiring the state lock` | Another apply running, or one crashed | Wait; if it crashed, `terraform force-unlock <ID>` |
+| `Instance cannot be destroyed` | `prevent_destroy` on the state bucket | Expected — see Step 8 to remove it on purpose |
+| `Error acquiring the state lock` (`412 PreconditionFailed`) | Another apply is running, or one crashed | Wait and retry; only if a run crashed: `terraform force-unlock <ID>` |
 | Page doesn't load / `curl` times out | nginx still installing, or missing egress rule | Wait 2 min; check the security group rules |
 | `Unsupported argument "use_lockfile"` | Terraform older than 1.11 | Upgrade Terraform |
 
@@ -466,12 +642,16 @@ Right now every environment uses the local `../../modules` path, so a module cha
 6. What makes a subnet "public"?
 7. Why is the AMI a data block instead of a variable?
 8. What is different between the dev and staging folders?
+9. Why can't an environment read `module.nginx_web_app.vpc_id` until `nginx-web-app` outputs it?
+10. A brand-new environment's first plan says `No changes`. What went wrong, and how do I fix it without touching the other environment?
+11. When do I use `terraform init -reconfigure` vs `-migrate-state`?
+12. Why does a second `terraform apply` fail with a state lock error, and when is `force-unlock` safe?
 
 ---
 
 ## Interview Version
 
-> "I built an nginx web app on AWS with Terraform, split into four small reusable modules — VPC, security group, IAM, and EC2 — plus one central module that wires them together by passing outputs into inputs, like the VPC ID into the security group. Each environment — dev, staging, production — is a tiny root module that makes one call to that central module with its own tfvars. State is stored remotely in S3 with native locking and a separate key per environment, so the environments are fully isolated, and the state bucket is created once in a bootstrap folder with versioning and `prevent_destroy`. Terraform works out the build order from references; I only use `depends_on` for the one hidden link, where the EC2 instance has to wait for the IAM policy attachment. The server gets an SSM role, so I connect with Session Manager instead of opening SSH to the world, and the AMI comes from a data source, so there are no hard-coded IDs."
+> "I built an nginx web app on AWS with Terraform, split into four small reusable modules — VPC, security group, IAM, and EC2 — plus one central module that wires them together by passing outputs into inputs, like the VPC ID into the security group. Each environment — dev, staging, production — is a tiny root module that makes one call to that central module with its own tfvars. State is stored remotely in S3 with native locking and a separate key per environment, so the environments are fully isolated, and the state bucket is created once in a bootstrap folder with versioning and `prevent_destroy`. Terraform works out the build order from references; I only use `depends_on` for the one hidden link, where the EC2 instance has to wait for the IAM policy attachment. The server gets an SSM role, so I connect with Session Manager instead of opening SSH to the world, and the AMI comes from a data source, so there are no hard-coded IDs. I also broke it on purpose to learn the real failure modes — like reading a nested module's output that was never passed up, or copying dev to staging but leaving the backend key on dev, where the new folder silently takes control of dev's state. I catch that by checking that a new environment's first plan is all adds and its `state list` is empty, and fix it with `terraform init -reconfigure`."
 
 ---
 
