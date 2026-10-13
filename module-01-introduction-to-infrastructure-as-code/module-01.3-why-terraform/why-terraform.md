@@ -94,13 +94,15 @@ Every Terraform operation goes through three phases:
 
 ## Every Managed Thing Is a "Resource"
 
-Anything Terraform manages — compute instances, database servers, physical on-prem machines — is called a **resource**. Terraform doesn't just create these once and forget them; it continuously tracks their state, so any future changes get applied consistently.
+Anything Terraform manages — compute instances, database servers, physical on-prem machines — is called a **resource**. Terraform doesn't just create these once and forget them; it records them in a state file, and every time I run `plan` or `apply` it checks the real resources against that record, so future changes get applied consistently. (It is not watching in the background — it only checks when I run a command.)
 
 ![terraform.tfstate mapping each managed resource to the matching real world infrastructure](images/08-terraform-state.png)
 
 This is what `terraform.tfstate` actually is — a file that keeps a 1-to-1 map between what's written in my `.tf` config and what actually exists out in AWS/Azure/GCP. It's how Terraform knows the difference between "this doesn't exist yet" and "this already exists, don't recreate it."
 
-**Data sources:** Terraform can also *import* infrastructure that already exists (created manually or by something else) into its own management framework using data sources — so I'm not limited to only managing things Terraform itself created from scratch.
+**Import:** Terraform can also bring infrastructure that already exists (created manually or by something else) under its own management using `terraform import` (or the `import {}` block in Terraform 1.5+) — so I'm not limited to only managing things Terraform itself created from scratch.
+
+> ⚠️ **Don't mix these up:** a **data source** only *reads* info about something that already exists (e.g. look up the latest AMI ID). It does **not** manage it — Terraform won't change or delete it. **Import** is what actually puts an existing resource into the state file so Terraform manages it. (More in Module 09.)
 
 ![Terraform import mapping existing infrastructure, including a database not originally created by Terraform, into terraform.tfstate](images/09-terraform-import.png)
 
@@ -116,6 +118,10 @@ Beyond the CLI I've been using, HashiCorp also offers:
 - **Terraform Enterprise** — the enterprise-grade version with additional security and governance features
 
 ![Terraform Cloud workspaces dashboard showing run status for two projects](images/10-terraform-cloud-enterprise.png)
+
+> 🔄 **What's changed since the course:**
+> - **Terraform Cloud** was renamed **HCP Terraform** in 2024. Same product, new name.
+> - HashiCorp (the company behind Terraform) is now part of **IBM** (deal closed in 2025).
 
 > 📖 **Read More** → [Terraform CLI vs Terraform Cloud](https://github.com/Abhignadumpala/terraform-notes-kodekloud/blob/main/terraform-cli-vs-cloud.md#terraform-cli-vs-terraform-cloud)
 

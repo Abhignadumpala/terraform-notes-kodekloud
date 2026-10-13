@@ -59,12 +59,16 @@ Cloud providers (AWS, Azure, GCP) collapsed the entire chain — Business → Pr
 The traditional multi-team, multi-week process becomes a 7-step wizard anyone can complete themselves:
 
 1. Choose AMI (the operating system)
-2. Choose instance type (e.g. `t2.micro` — free tier eligible)
+2. Choose instance type (e.g. `t3.micro`)
 3. Configure instance
 4. Add storage
 5. Add tags
 6. Configure security group
 7. Review and launch
+
+> 🔄 **What's changed since the course:**
+> - The EC2 console is now **one single "Launch an instance" page** (since ~2022), not 7 separate screens. Same choices, just on one page.
+> - The course used `t2.micro` as the free tier type. Today `t3.micro` is the usual free-tier choice (new AWS accounts since July 2025 get a credit-based Free plan instead of the old 12-month free tier).
 
 No procurement ticket. No waiting on five different admin teams. No physical hardware to buy.
 
@@ -75,26 +79,29 @@ No procurement ticket. No waiting on five different admin teams. No physical har
 | Buy physical hardware upfront | Pay only for what you use, by the hour/second |
 | Weeks of procurement + provisioning | Minutes — self-service, click "Launch" |
 | Separate specialized admin teams (network/storage/backup) | One person (or one script) manages it all through an API |
-| Manual, inconsistent setup each time | Same configuration every time |
+| Physical setup by hand in the data center | Setup in a web console — faster, but still clicking by hand (can still differ each time) |
 | Guess capacity needs, often over-provision | Scale up or down on demand |
 
 ---
 
 ## The Next Step Beyond the Console
 
-Even the cloud console wizard shown above still involves manually clicking through 7 screens each time. This is exactly the gap **Infrastructure as Code** (Terraform, CloudFormation, CDK) closes:
+Even the cloud console still means clicking through the same choices by hand every time — and two people clicking can easily end up with two slightly different servers. This is exactly the gap **Infrastructure as Code** (Terraform, CloudFormation, CDK) closes:
 
 - Instead of clicking through a wizard, the same EC2 instance is described in a config file
-- Running it is instant, repeatable, and version-controlled in Git
+- Running it is fast, repeatable, and version-controlled in Git — the **same configuration every time**
 - No manual re-clicking through the same steps for the next environment (dev, staging, prod)
 
 **Progression to keep in mind:**
+
+![Creating a server: Traditional IT vs Cloud vs Terraform](images/01-traditional-vs-cloud-vs-terraform.png)
+
 ```
 Traditional IT (weeks, many teams)
         ↓
 Cloud console (minutes, self-service, but still manual clicking)
         ↓
-Infrastructure as Code (seconds, automated, repeatable, version-controlled)
+Infrastructure as Code (one command, automated, repeatable, version-controlled)
 ```
 
 ---
