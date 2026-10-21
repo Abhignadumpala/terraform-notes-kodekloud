@@ -142,6 +142,8 @@ In this class I only did a simple lab on **file management** (the `local_file` r
 
 > Before any of these, finish [Connecting Terraform to AWS](#connecting-terraform-to-aws).
 
+> 📌 **"Module" in folder names = course lesson, not a Terraform module.** The early course modules (01–02) were basics without AWS. AWS labs start from Module 03. Terraform modules (reusable code) are in [Module 10: What are modules](../../module-10-terraform-modules/module-10.1-what-are-modules/README.md), and my full AWS modules project is [nginx web app with reusable Terraform modules (dev, staging, production)](../../terraform-projects/terraform-modules-multi-env/README.md): VPC, security group, IAM and EC2 modules with an S3 backend.
+
 ## Starting simple
 
 Before jumping into real cloud resources, it helps to practice with two simple, free resource types:
