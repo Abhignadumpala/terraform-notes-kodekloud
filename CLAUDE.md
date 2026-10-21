@@ -24,6 +24,7 @@ module-0<N>-<topic>/
     hands-on-lab/           # actual .tf files from the lab, if the lesson had one
 ```
 
+- The root `README.md` is the index: table of contents, one table per course module, projects and standalone notes. When adding a lesson, lab, interview-questions folder or project, add its row there too. The `module-0N` folder names mean **course classes**, not Terraform modules; the README says so at the top.
 - `core-workflow/` and `terraform-cli-vs-cloud.md` at the repo root are standalone notes not tied to a single module number.
 - `terraform-projects/` at the repo root holds standalone, self-contained Terraform projects that aren't tied to a specific course lesson (e.g. interview-prep or portfolio-style labs) — flat kebab-case project folders, each with its own single README (concept + structure + how to run it, not split into a module-note/hands-on-lab pair) plus its own `.tf`/`.tfvars` files.
 - When adding a new sub-lesson (e.g. `03.9`), follow the existing sibling folders in that module for naming — check 1-2 neighboring folders first, since conventions have drifted (see below), and match the most recent one rather than the oldest.
