@@ -207,3 +207,4 @@ Standalone projects in [`terraform-projects/`](./terraform-projects/). These are
 |------|----------|
 | [Terraform core workflow](./core-workflow/terraform-core-workflow.md) | 📝 init → plan → apply |
 | [Terraform CLI vs Terraform Cloud](./terraform-cli-vs-cloud.md) | 📝 Local CLI vs HCP Terraform |
+| [AWS resource code](./aws-resource-code/README.md) | ☁️ Basic resource code, one file each: VPC, subnets, internet gateway, route table, security group, EC2, S3, IAM |
