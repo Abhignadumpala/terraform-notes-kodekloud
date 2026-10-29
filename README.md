@@ -48,7 +48,7 @@ I named each class folder **`module-01`, `module-02`, `module-03`…** as I went
 | 4. Advanced | Module 09–11 | Import, taint, debugging, **Terraform modules**, workspaces |
 | 5. Projects | `terraform-projects/` | Real end-to-end builds: dev/prod EC2 sizing, nginx app with reusable modules (dev, staging, prod) |
 
-> Before any AWS lab: install the AWS CLI, run `aws configure`, and add a `provider "aws"` block. Steps: [Connecting Terraform to AWS](./module-02-getting-started-with-terraform/module-02.2-hashicorp-configuration-language-hcl-basics/module%2002.1-installing-terraform.md#connecting-terraform-to-aws).
+> **Before any AWS lab:** follow [Lab Setup: connect Terraform to AWS and create your first resources](./lab-setup-terraform-aws/README.md) (IAM user → access key → `aws configure` → install Terraform → first EC2 + SG lab).
 
 ---
 
@@ -205,6 +205,7 @@ Standalone projects in [`terraform-projects/`](./terraform-projects/). These are
 
 | Note | Contains |
 |------|----------|
+| [Lab Setup: Terraform + AWS](./lab-setup-terraform-aws/README.md) | 📝 🧪 ☁️ IAM user, access key, `aws configure`, authentication vs authorization, first EC2 + SG lab step by step |
 | [Terraform core workflow](./core-workflow/terraform-core-workflow.md) | 📝 init → plan → apply |
 | [Terraform CLI vs Terraform Cloud](./terraform-cli-vs-cloud.md) | 📝 Local CLI vs HCP Terraform |
 | [AWS resource code](./aws-resource-code/README.md) | ☁️ Basic resource code, one file each: VPC, subnets, internet gateway, route table, security group, EC2, S3, IAM |

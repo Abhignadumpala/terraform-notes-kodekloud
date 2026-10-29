@@ -34,6 +34,8 @@ on linux_amd64
 
 ## Connecting Terraform to AWS
 
+> 📘 Full beginner guide with every click and command: [Lab Setup: Terraform + AWS](../../lab-setup-terraform-aws/README.md)
+
 Installing Terraform alone isn't enough to create anything on AWS. Terraform has to know **which account** to log in to and **which region** to use. Without that, `terraform plan` on an AWS resource fails with a "no valid credential sources" or "missing region" error.
 
 I need three things before the EC2 example below can work:

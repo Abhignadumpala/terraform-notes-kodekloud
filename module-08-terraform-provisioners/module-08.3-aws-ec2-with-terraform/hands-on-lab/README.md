@@ -4,6 +4,47 @@
 
 ---
 
+## Before I Start: Prerequisites
+
+Terraform creates AWS resources by calling the AWS API **as an IAM user**, so these must be ready first (full click-by-click guide: [Lab Setup: Terraform + AWS](../../../lab-setup-terraform-aws/README.md)):
+
+| # | Prerequisite | How | Check |
+|---|---|---|---|
+| 1 | AWS account | sign up at aws.amazon.com | can log in to the console |
+| 2 | IAM user with permissions | IAM → Users → Create user → attach `AdministratorAccess` (lab) | user shows in IAM |
+| 3 | Access key for that user | IAM → Users → Security credentials → Create access key (CLI) | key ID + secret saved |
+| 4 | AWS CLI installed | [install steps](../../../lab-setup-terraform-aws/README.md#step-3-install-the-aws-cli) | `aws --version` |
+| 5 | Credentials configured | `aws configure` → key, secret, `us-east-1`, `json` | `aws sts get-caller-identity` shows my user |
+| 6 | Terraform installed | [install steps](../../../lab-setup-terraform-aws/README.md#step-5-install-terraform) | `terraform version` |
+
+> **Authentication** = the access key proves who I am. **Authorization** = the IAM policies on the user decide what I'm allowed to create (EC2, key pair, SG). No keys go in the `.tf` files: the AWS provider reads `~/.aws/credentials`.
+
+## Steps to Run This Lab
+
+| # | Step | Command / action |
+|---|---|---|
+| 1 | Go to the lab code | `cd module-08-terraform-provisioners/module-08.3-aws-ec2-with-terraform/hands-on-lab/ec2-terraform-code` (from the repo root) |
+| 2 | Look at the 3 files | `provider.tf` (aws + tls providers, region), `main.tf` (AMI lookup, key pair, SG + rules, EC2), `outputs.tf` (public IP, AMI, private key) |
+| 3 | Download providers | `terraform init` → downloads **aws** and **tls** |
+| 4 | Preview | `terraform plan` → `6 to add` |
+| 5 | Create | `terraform apply` → type `yes` |
+| 6 | Save the SSH key | `terraform output -raw ssh_private_key > web.pem && chmod 600 web.pem` |
+| 7 | SSH in | `ssh -i web.pem ubuntu@$(terraform output -raw public_ip)` |
+| 8 | Check nginx | `systemctl is-active nginx` → `active` (wait ~1 min after apply for `user_data`) |
+| 9 | Clean up | `terraform destroy` → type `yes`, then `rm web.pem` |
+
+```
+terraform apply
+   │
+   ├─► tls_private_key ──► aws_key_pair ──┐
+   ├─► aws_security_group ──► ingress (22) + egress (all) ─┤
+   └─► data.aws_ami (latest Ubuntu 24.04) ─────────────────┴─► aws_instance (user_data installs nginx)
+```
+
+The step-by-step run with my real output is below.
+
+---
+
 ## What I Built
 
 - **`data.aws_ami.ubuntu`** — most-recent Ubuntu 24.04 (Noble) LTS from Canonical, resolved fresh at apply time.

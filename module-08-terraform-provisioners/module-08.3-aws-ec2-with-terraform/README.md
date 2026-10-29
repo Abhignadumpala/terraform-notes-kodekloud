@@ -2,6 +2,8 @@
 
 > [8.1](../module-08.1-introduction-to-aws-ec2/README.md) covered what an EC2 instance actually is. This is deploying one for real: an Ubuntu web server, key-based SSH access, and a security group that actually allows the connection — the running instance that [Module 8](../)'s real subject, provisioners, needs to exist first.
 
+> 🧪 **Doing the lab?** Prerequisites (IAM user, access key, `aws configure`, Terraform) and run steps: [Hands-on lab → Before I Start](./hands-on-lab/README.md#before-i-start-prerequisites).
+
 ---
 
 ## Introduction
