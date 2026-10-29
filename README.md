@@ -2,6 +2,8 @@
 
 My study notes, hands-on labs and projects from the **KodeKloud Terraform** course. I wrote them class by class as I went, in my own words, with screenshots from the labs I ran.
 
+> 🧪 **Want to do the AWS labs step by step?** They're cleaned up, in order, in one place: [terraform-aws-labs](https://github.com/Abhignadumpala/terraform-aws-labs) (setup → EC2, SG, IAM, S3, DynamoDB → count/for_each/lifecycle → state → provisioners → modules project). This repo keeps the theory and my original class notes.
+
 ---
 
 ## 📌 Read this first: "module" in folder names = my class, NOT a Terraform module
